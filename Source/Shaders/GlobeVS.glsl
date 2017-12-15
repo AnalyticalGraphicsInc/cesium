@@ -156,10 +156,13 @@ void main()
 
     v_textureCoordinates = vec3(textureCoordinates, webMercatorT);
 
+    vec3 ellipsoidNormal = normalize(position3DWC.xyz);
+    vec3 normalMC = ellipsoidNormal;
+
 #if defined(ENABLE_VERTEX_LIGHTING) || defined(GENERATE_POSITION_AND_NORMAL)
     v_positionEC = (u_modifiedModelView * vec4(position, 1.0)).xyz;
     v_positionMC = position3DWC;                                 // position in model coordinates
-    vec3 normalMC = czm_octDecode(encodedNormal);
+    normalMC = czm_octDecode(encodedNormal);
     v_normalMC = normalMC;
     v_normalEC = czm_normal3D * v_normalMC;
 #elif defined(SHOW_REFLECTIVE_OCEAN) || defined(ENABLE_DAYNIGHT_SHADING) || defined(GENERATE_POSITION)
@@ -176,7 +179,6 @@ void main()
 
 #ifdef APPLY_MATERIAL
     vec3 finalNormal = normalMC;
-    vec3 ellipsoidNormal = normalize(position3DWC.xyz);
     v_slope = abs(dot(ellipsoidNormal, finalNormal));
     v_height = height;
 #endif

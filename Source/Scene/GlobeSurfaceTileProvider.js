@@ -41,6 +41,7 @@ define([
         '../Scene/Primitive',
         './GlobeSurfaceTile',
         './ImageryLayer',
+        './ImagerySplitDirection',
         './QuadtreeTileLoadState',
         './SceneMode',
         './ShadowMode'
@@ -87,6 +88,7 @@ define([
         Primitive,
         GlobeSurfaceTile,
         ImageryLayer,
+        ImagerySplitDirection,
         QuadtreeTileLoadState,
         SceneMode,
         ShadowMode) {
@@ -163,6 +165,7 @@ define([
         this._firstPassInitialColor = undefined;
         this.baseColor = new Color(0.0, 0.0, 0.5, 1.0);
 
+        this._cullingEnabled = true;
         /**
          * A property specifying a {@link ClippingPlaneCollection} used to selectively disable rendering on the outside of each plane.
          * @type {ClippingPlaneCollection}
@@ -376,17 +379,18 @@ define([
         if (!defined(this._renderState)) {
             this._renderState = RenderState.fromCache({ // Write color and depth
                 cull : {
-                    enabled : true
+                    enabled : this._cullingEnabled
                 },
                 depthTest : {
                     enabled : true,
                     func : DepthFunction.LESS
-                }
+                },
+                blending : BlendingState.ALPHA_BLEND
             });
 
             this._blendRenderState = RenderState.fromCache({ // Write color and depth
                 cull : {
-                    enabled : true
+                    enabled : this._cullingEnabled
                 },
                 depthTest : {
                     enabled : true,
@@ -866,6 +870,9 @@ define([
             u_scaleAndBias : function() {
                 return this.properties.scaleAndBias;
             },
+            u_splitDirection: function () {
+                return this.properties.splitDirection;
+            },
             u_dayTextureSplit : function() {
                 return this.properties.dayTextureSplit;
             },
@@ -908,6 +915,7 @@ define([
                 dayTextureSaturation : [],
                 dayTextureOneOverGamma : [],
                 dayTextureSplit : [],
+                splitDireciton: ImagerySplitDirection.NONE,
                 dayIntensity : 0.0,
 
                 southAndNorthLatitude : new Cartesian2(),
@@ -1285,6 +1293,9 @@ define([
 
                 ++numberOfDayTextures;
             }
+
+            uniformMapProperties.splitDirection = tileProvider.splitDirection;
+            applySplit = applySplit || tileProvider.splitDirection !== 0.0;
 
             // trim texture array to the used length so we don't end up using old textures
             // which might get destroyed eventually

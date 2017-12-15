@@ -38,6 +38,10 @@ uniform float u_dayTextureOneOverGamma[TEXTURE_UNITS];
 uniform vec4 u_dayTextureTexCoordsRectangle[TEXTURE_UNITS];
 #endif
 
+#ifdef APPLY_SPLIT
+uniform float u_splitDirection;
+#endif
+
 #ifdef SHOW_REFLECTIVE_OCEAN
 uniform sampler2D u_waterMask;
 uniform vec4 u_waterMaskTranslationAndScale;
@@ -228,6 +232,18 @@ void main()
     vec4 finalColor = color;
 #endif
 
+
+#ifdef APPLY_SPLIT
+    float splitPosition = czm_imagerySplitPosition;
+    // Split to the left
+    if (u_splitDirection < 0.0 && gl_FragCoord.x > splitPosition) {
+       discard;
+    }
+    // Split to the right
+    else if (u_splitDirection > 0.0 && gl_FragCoord.x < splitPosition) {
+       discard;
+#endif
+
 #ifdef ENABLE_CLIPPING_PLANES
     vec4 clippingPlanesEdgeColor = vec4(1.0);
     clippingPlanesEdgeColor.rgb = u_clippingPlanesEdgeStyle.rgb;
@@ -248,6 +264,9 @@ void main()
     float darken = clamp(dot(normalize(czm_viewerPositionWC), normalize(czm_sunPositionWC)), u_minimumBrightness, 1.0);
     fogColor *= darken;
 #endif
+
+    // Just make it blue to see how it looks underwater.
+    fogColor = vec3(0.0, 119.0/255.0, 190.0/255.0);
 
     gl_FragColor = vec4(czm_fog(v_distance, finalColor.rgb, fogColor), finalColor.a);
 #else
