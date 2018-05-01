@@ -23,6 +23,7 @@ define([
         '../ThirdParty/when',
         './GlobeSurfaceShaderSet',
         './GlobeSurfaceTileProvider',
+        './ImagerySplitDirection',
         './ImageryLayerCollection',
         './QuadtreePrimitive',
         './SceneMode',
@@ -52,6 +53,7 @@ define([
         when,
         GlobeSurfaceShaderSet,
         GlobeSurfaceTileProvider,
+        ImagerySplitDirection,
         ImageryLayerCollection,
         QuadtreePrimitive,
         SceneMode,
@@ -188,6 +190,8 @@ define([
 
         this._oceanNormalMap = undefined;
         this._zoomedOutOceanSpecularIntensity = 0.5;
+
+        this.splitDirection = ImagerySplitDirection.NONE;
     }
 
     defineProperties(Globe.prototype, {
@@ -628,6 +632,7 @@ define([
             tileProvider.oceanNormalMap = this._oceanNormalMap;
             tileProvider.enableLighting = this.enableLighting;
             tileProvider.shadows = this.shadows;
+            tileProvider.splitDirection = this.splitDirection;
 
             surface.beginFrame(frameState);
         }

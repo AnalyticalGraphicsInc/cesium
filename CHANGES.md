@@ -25,6 +25,7 @@ Change Log
 * Added option `logarithmicDepthBuffer` to `Scene`. With this option there is typically a single frustum using logarithmic depth rendered. This increases performance by issuing less draw calls to the GPU and helps to avoid artifacts on the connection of two frustums. [#5851](https://github.com/AnalyticalGraphicsInc/cesium/pull/5851)
 * When a log depth buffer is supported, the frustum near and far planes default to `0.1` and `1e10` respectively.
 * Added `Math.log2` to compute the base 2 logarithm of a number.
+* Added support for multiple globes. [#6450](https://github.com/AnalyticalGraphicsInc/cesium/pull/6450)
 * Added 'PeliasGeocoderService', which provides geocoding via a [Pelias](https://pelias.io) server.
 * Added `GeocodeType` enum and use it as an optional parameter to all `GeocoderService` instances to differentiate between autocomplete and search requests.
 * Added `initWebAssemblyModule` function to `TaskProcessor` to load a Web Assembly module in a web worker. [#6420](https://github.com/AnalyticalGraphicsInc/cesium/pull/6420)

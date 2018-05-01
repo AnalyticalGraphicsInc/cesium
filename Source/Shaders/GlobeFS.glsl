@@ -37,6 +37,10 @@ uniform float u_dayTextureOneOverGamma[TEXTURE_UNITS];
 uniform vec4 u_dayTextureTexCoordsRectangle[TEXTURE_UNITS];
 #endif
 
+#ifdef APPLY_SPLIT
+uniform float u_splitDirection;
+#endif
+
 #ifdef SHOW_REFLECTIVE_OCEAN
 uniform sampler2D u_waterMask;
 uniform vec4 u_waterMaskTranslationAndScale;
@@ -234,6 +238,19 @@ void main()
         finalColor = clippingPlanesEdgeColor;
     }
 #endif
+
+#ifdef APPLY_SPLIT
+    float splitPosition = czm_imagerySplitPosition;
+    // Split to the left
+    if (u_splitDirection < 0.0 && gl_FragCoord.x > splitPosition) {
+       discard;
+    }
+    // Split to the right
+    else if (u_splitDirection > 0.0 && gl_FragCoord.x < splitPosition) {
+       discard;
+    }
+#endif
+
 
 #ifdef FOG
     const float fExposure = 2.0;
