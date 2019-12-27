@@ -1,5 +1,7 @@
 import Cartesian2 from '../Core/Cartesian2.js';
+import Cartesian3 from '../Core/Cartesian3.js';
 import Cartesian4 from '../Core/Cartesian4.js';
+import Cartographic from '../Core/Cartographic.js';
 import defaultValue from '../Core/defaultValue.js';
 import defined from '../Core/defined.js';
 import defineProperties from '../Core/defineProperties.js';
@@ -9,6 +11,7 @@ import FeatureDetection from '../Core/FeatureDetection.js';
 import GeographicProjection from '../Core/GeographicProjection.js';
 import IndexDatatype from '../Core/IndexDatatype.js';
 import CesiumMath from '../Core/Math.js';
+import oneTimeWarning from '../Core/oneTimeWarning.js';
 import PixelFormat from '../Core/PixelFormat.js';
 import Rectangle from '../Core/Rectangle.js';
 import Request from '../Core/Request.js';
@@ -32,6 +35,8 @@ import TextureWrap from '../Renderer/TextureWrap.js';
 import VertexArray from '../Renderer/VertexArray.js';
 import ReprojectWebMercatorFS from '../Shaders/ReprojectWebMercatorFS.js';
 import ReprojectWebMercatorVS from '../Shaders/ReprojectWebMercatorVS.js';
+import ReprojectArbitraryVS from '../Shaders/ReprojectArbitraryVS.js';
+import ReprojectArbitraryFS from '../Shaders/ReprojectArbitraryFS.js';
 import when from '../ThirdParty/when.js';
 import Imagery from './Imagery.js';
 import ImagerySplitDirection from './ImagerySplitDirection.js';
@@ -112,6 +117,7 @@ import TileImagery from './TileImagery.js';
      * @param {Number} [options.maximumTerrainLevel] The maximum terrain level-of-detail at which to show this imagery layer,
      *                 or undefined to show it at all levels.  Level zero is the least-detailed level.
      * @param {Rectangle} [options.cutoutRectangle] Cartographic rectangle for cutting out a portion of this ImageryLayer.
+     * @param {Number} [options.projectedImageryReprojectionWidth=128] Width of the grid for reprojecting imagery that uses a {@link ProjectedImageryTilingScheme}. Clamps between 2-255 (inclusive).
      * @param {Color} [options.colorToAlpha] Color to be used as alpha.
      * @param {Number} [options.colorToAlphaThreshold=0.004] Threshold for color-to-alpha.
      */
@@ -237,6 +243,9 @@ import TileImagery from './TileImagery.js';
 
         this._reprojectComputeCommands = [];
 
+        var reprojectionVertexWidth = defaultValue(options.projectedImageryReprojectionWidth, ImageryLayer.DEFAULT_PROJECTED_IMAGERY_REPROJECTION_WIDTH);
+        this._arbitraryReprojectionWidth = CesiumMath.clamp(reprojectionVertexWidth, 2, 255);
+
         /**
          * Rectangle cutout in this layer of imagery.
          *
@@ -346,6 +355,13 @@ import TileImagery from './TileImagery.js';
      * @default TextureMagnificationFilter.LINEAR
      */
     ImageryLayer.DEFAULT_MAGNIFICATION_FILTER = TextureMagnificationFilter.LINEAR;
+
+    /**
+     * This value is used as the default grid width when reprojecting imagery that uses a {@link ProjectedImageryTilingScheme}.
+     * @type {Number}
+     * @default 128
+     */
+    ImageryLayer.DEFAULT_PROJECTED_IMAGERY_REPROJECTION_WIDTH = 128;
 
     /**
      * This value is used as the default threshold for color-to-alpha if one is not provided
@@ -796,6 +812,100 @@ import TileImagery from './TileImagery.js';
     };
 
     /**
+     * Request a particular piece of projected imagery from the imagery provider that will be integrated into a
+     * geographic-projected Imagery tile.
+     *
+     * This method handles raising an error event if the request fails, and retrying the request if necessary.
+     *
+     * @private
+     *
+     * @param {Imagery} imagery The imagery to request.
+     * @param {Number[]} projectedIndices The x/y coordinates of the projected images to be requested.
+     * @param {Number} level The level of the projected images to request.
+     * @param {Number} imageIndex The index of the image to request.
+     * @param {Function} [priorityFunction] The priority function used for sorting the imagery request.
+     */
+    ImageryLayer.prototype._requestProjectedImages = function(imagery, projectedIndices, level, imageIndex, priorityFunction) {
+        var imageryProvider = this._imageryProvider;
+
+        var indicesStart = imageIndex * 2;
+        var x = projectedIndices[indicesStart];
+        var y = projectedIndices[indicesStart + 1];
+        var finalImage = indicesStart === (projectedIndices.length - 2);
+
+        var that = this;
+
+        function success(image) {
+            if (!defined(image)) {
+                return failure(undefined);
+            }
+
+            imagery.projectedImages[imageIndex] = image;
+            imagery.request = undefined;
+
+            if (finalImage) {
+                imagery.state = ImageryState.RECEIVED;
+                return;
+            }
+
+            TileProviderError.handleSuccess(that._requestImageError);
+
+            that._requestProjectedImages(imagery, projectedIndices, level, imageIndex + 1, priorityFunction);
+        }
+
+        function failure(e) {
+            if (imagery.request.state === RequestState.CANCELLED) {
+                // Cancelled due to low priority - try again later.
+                imagery.state = ImageryState.UNLOADED;
+                imagery.request = undefined;
+                return;
+            }
+
+            // Initially assume failure.  handleError may retry, in which case the state will
+            // change to TRANSITIONING.
+            imagery.state = ImageryState.FAILED;
+            imagery.request = undefined;
+
+            var message = 'Failed to obtain image tile X: ' + x + ' Y: ' + y + ' Level: ' + level + '. ';
+            that._requestImageError = TileProviderError.handleError(
+                    that._requestImageError,
+                    imageryProvider,
+                    imageryProvider.errorEvent,
+                    message,
+                    x, y, level,
+                    doRequest,
+                    e);
+        }
+
+        function doRequest() {
+            var request = new Request({
+                throttle : true,
+                throttleByServer : true,
+                type : RequestType.IMAGERY,
+                priorityFunction : priorityFunction
+            });
+            imagery.request = request;
+            imagery.state = ImageryState.TRANSITIONING;
+            var imagePromise = imageryProvider.requestImage(x, y, level, request);
+
+            if (!defined(imagePromise)) {
+                // Too many parallel requests, so postpone loading tile.
+                imagery.state = ImageryState.UNLOADED;
+                imagery.request = undefined;
+                return;
+            }
+
+            if (defined(imageryProvider.getTileCredits) && finalImage) {
+                imagery.credits = imageryProvider.getTileCredits(x, y, level);
+            }
+
+            when(imagePromise, success, failure);
+        }
+
+        doRequest();
+    };
+
+    /**
      * Create a WebGL texture for a given {@link Imagery} instance.
      *
      * @private
@@ -843,6 +953,92 @@ import TileImagery from './TileImagery.js';
             imagery.texture = texture;
         }
         imagery.image = undefined;
+        imagery.state = ImageryState.TEXTURE_LOADED;
+    };
+
+    /**
+     * Creates WebGL textures for each image in a given multi-source {@link Imagery} instance.
+     * @private
+     *
+     * @param {Context} context The rendered context to use to create textures.
+     * @param {Imagery} imagery The imagery for which to create a texture.
+     */
+    ImageryLayer.prototype._createMultipleTextures = function(context, imagery) {
+        var imageryProvider = this._imageryProvider;
+        var projectedImages = imagery.projectedImages;
+        var projectedImagesLength = projectedImages.length;
+        var i;
+
+        // If this imagery provider has a discard policy, use it to check if the
+        // images should be discarded.
+        if (defined(imageryProvider.tileDiscardPolicy)) {
+            var discardPolicy = imageryProvider.tileDiscardPolicy;
+            if (defined(discardPolicy)) {
+                // If the discard policy is not ready yet, transition back to the
+                // RECEIVED state and we'll try again next time.
+                if (!discardPolicy.isReady()) {
+                    imagery.state = ImageryState.RECEIVED;
+                    return;
+                }
+
+                // If any imagery tiles are invalid, mark the generated imagery tile as invalid.
+                // Parent imagery will be used instead.
+                for (i = 0; i < projectedImagesLength; i++) {
+                    if (discardPolicy.shouldDiscardImage(projectedImages[i])) {
+
+                        //>>includeStart('debug', pragmas.debug);
+                        oneTimeWarning('Discarding images from an imagery tileset in this projection may cause portions of other images to also be discarded.');
+                        //>>includeEnd('debug');
+
+                        imagery.state = ImageryState.INVALID;
+                        return;
+                    }
+                }
+            }
+        }
+
+        //>>includeStart('debug', pragmas.debug);
+        if (this.minificationFilter !== TextureMinificationFilter.NEAREST &&
+            this.minificationFilter !== TextureMinificationFilter.LINEAR) {
+            throw new DeveloperError('ImageryLayer minification filter must be NEAREST or LINEAR');
+        }
+        //>>includeEnd('debug');
+
+        var sampler = new Sampler({
+            minificationFilter : this.minificationFilter,
+            magnificationFilter : this.magnificationFilter
+        });
+
+        for (i = 0; i < projectedImagesLength; i++) {
+            var image = projectedImages[i];
+
+            var texture;
+            if (defined(image.internalFormat)) {
+                texture = new Texture({
+                    context : context,
+                    pixelFormat : image.internalFormat,
+                    width : image.width,
+                    height : image.height,
+                    source : {
+                        arrayBufferView : image.bufferView
+                    },
+                    sampler : sampler
+                });
+            } else {
+                texture = new Texture({
+                    context : context,
+                    source : image,
+                    pixelFormat : imageryProvider.hasAlphaChannel ? PixelFormat.RGBA : PixelFormat.RGB,
+                    sampler : sampler
+                });
+            }
+            if (defined(image.destroy)) {
+                image.destroy();
+            }
+
+            imagery.projectedTextures[i] = texture;
+        }
+        imagery.projectedImages.length = 0;
         imagery.state = ImageryState.TEXTURE_LOADED;
     };
 
@@ -948,6 +1144,243 @@ import TileImagery from './TileImagery.js';
             imagery.state = ImageryState.READY;
         }
     };
+
+    function MakeCommandOptions() {
+        this.projectedCoordinates = undefined;
+        this.shaderProgram = undefined;
+        this.context = undefined;
+        this.outputTexture = undefined;
+        this.imagery = undefined;
+        this.imageryLayer = undefined;
+        this.vertexArray = undefined;
+        this.projectedRectangle = undefined;
+        this.projectedTexture = undefined;
+        this.final = undefined;
+    }
+
+    var arbitraryReprojectAttributeIndices = {
+        position : 0,
+        projectedCoordinates : 1
+    };
+
+    var geographicCartographicScratch = new Cartographic();
+    var projectedScratch = new Cartesian3();
+
+    /**
+     * Enqueues commands re-projecting multiple textures to a {@link GeographicProjection} on the next update
+     * and generate mipmaps for the geographic texture.
+     */
+    ImageryLayer.prototype._multisourceReprojectTexture = function(frameState, imagery) {
+        var projectedTextures = imagery.projectedTextures;
+        var projectedRectangles = imagery.projectedRectangles;
+        var projectedTexturesLength = projectedTextures.length;
+        var someTexture = projectedTextures[0];
+
+        var width = someTexture.width;
+        var height = someTexture.height;
+
+        var outputTexture = imagery.texture = new Texture({
+            context : frameState.context,
+            width : width,
+            height : height,
+            pixelFormat : someTexture.pixelFormat,
+            pixelDatatype : someTexture.pixelDatatype,
+            preMultiplyAlpha : someTexture.preMultiplyAlpha
+        });
+
+        // Allocate memory for the mipmaps.  Failure to do this before rendering
+        // to the texture via the FBO, and calling generateMipmap later,
+        // will result in the texture appearing blank.  I can't pretend to
+        // understand exactly why this is.
+        if (CesiumMath.isPowerOfTwo(width) && CesiumMath.isPowerOfTwo(height)) {
+            outputTexture.generateMipmap(MipmapHint.NICEST);
+        }
+        var index;
+        var w;
+        var h;
+
+        var projection = this._imageryProvider.tilingScheme.sourceProjection;
+        var context = frameState.context;
+        var verticesWidth = this._arbitraryReprojectionWidth;
+        var contextCache = context.cache;
+
+        var sampler = contextCache.imageryLayer_arbitraryReprojectionSampler;
+        if (!defined(sampler)) {
+            sampler = contextCache.imageryLayer_arbitraryReprojectionSampler = new Sampler({
+                wrapS : TextureWrap.CLAMP_TO_EDGE,
+                wrapT : TextureWrap.CLAMP_TO_EDGE,
+                minificationFilter : TextureMinificationFilter.LINEAR,
+                magnificationFilter : TextureMagnificationFilter.LINEAR
+            });
+        }
+
+        var shaderProgram = contextCache.imageryLayer_arbitraryReprojectionShader;
+        if (!defined(shaderProgram)) {
+            shaderProgram = contextCache.imageryLayer_arbitraryReprojectionShader = ShaderProgram.fromCache({
+                context : context,
+                vertexShaderSource : ReprojectArbitraryVS,
+                fragmentShaderSource : ReprojectArbitraryFS,
+                attributeLocations : arbitraryReprojectAttributeIndices
+            });
+        }
+
+        var cachedVertexArrayKey = 'imageryLayer_reproject' + verticesWidth + '_vertexArray';
+        var vertexArray = contextCache[cachedVertexArrayKey];
+        if (!defined(vertexArray)) {
+            // Create reuseable position and index buffers
+            var positions = new Float32Array(verticesWidth * verticesWidth * 2);
+            index = 0;
+            var widthIncrement = 1.0 / (verticesWidth - 1);
+            var heightIncrement = 1.0 / (verticesWidth - 1);
+            for (w = 0; w < verticesWidth; w++) {
+                for (h = 0; h < verticesWidth; h++) {
+                    positions[index++] = w * widthIncrement;
+                    positions[index++] = h * heightIncrement;
+                }
+            }
+
+            var positionsBuffer = Buffer.createVertexBuffer({
+                context : context,
+                typedArray : positions,
+                usage : BufferUsage.STATIC_DRAW
+            });
+
+            var indexBuffer = Buffer.createIndexBuffer({
+                context : context,
+                typedArray : TerrainProvider.getRegularGridIndices(verticesWidth, verticesWidth),
+                usage : BufferUsage.STATIC_DRAW,
+                indexDatatype : IndexDatatype.UNSIGNED_SHORT
+            });
+
+            vertexArray = contextCache[cachedVertexArrayKey] = new VertexArray({
+                context: context,
+                attributes: [{
+                    index: arbitraryReprojectAttributeIndices.position,
+                    vertexBuffer: positionsBuffer,
+                    componentsPerAttribute: 2
+                }, {
+                    index: arbitraryReprojectAttributeIndices.projectedCoordinates,
+                    vertexBuffer : Buffer.createVertexBuffer({
+                        context : context,
+                        sizeInBytes : verticesWidth * verticesWidth * 2 * 4,
+                        usage : BufferUsage.STREAM_DRAW
+                    }),
+                    componentsPerAttribute: 2
+                }],
+                indexBuffer: indexBuffer
+            });
+        }
+
+        // For each vertex in the target grid, project into the projection
+        var cartographicRectangle = imagery.rectangle;
+        var south = cartographicRectangle.south;
+        var west = cartographicRectangle.west;
+
+        var unprojectedWidthIncrement = cartographicRectangle.width / (verticesWidth - 1);
+        var unprojectedHeightIncrement = cartographicRectangle.height / (verticesWidth - 1);
+        var geographicCartographic = geographicCartographicScratch;
+        var projected = projectedScratch;
+
+        var projectedCoordinates = new Float32Array(verticesWidth * verticesWidth * 2);
+        index = 0;
+        for (w = 0; w < verticesWidth; w++) {
+            for (h = 0; h < verticesWidth; h++) {
+                geographicCartographic.longitude = west + w * unprojectedWidthIncrement;
+                geographicCartographic.latitude = south + h * unprojectedHeightIncrement;
+
+                projection.project(geographicCartographic, projected);
+
+                projectedCoordinates[index++] = projected.x;
+                projectedCoordinates[index++] = projected.y;
+            }
+        }
+
+        for (var i = 0; i < projectedTexturesLength; i++) {
+            imagery.addReference();
+            var projectedTexture = projectedTextures[i];
+            projectedTexture.sampler = sampler;
+
+            var makeCommandOptions = new MakeCommandOptions();
+            makeCommandOptions.shaderProgram = shaderProgram;
+            makeCommandOptions.projectedCoordinates = projectedCoordinates;
+            makeCommandOptions.context = context;
+            makeCommandOptions.outputTexture = outputTexture;
+            makeCommandOptions.imagery = imagery;
+            makeCommandOptions.imageryLayer = this;
+            makeCommandOptions.vertexArray = vertexArray;
+            makeCommandOptions.projectedTexture = projectedTexture;
+            makeCommandOptions.projectedRectangle = projectedRectangles[i];
+            makeCommandOptions.final = (i === projectedTexturesLength - 1);
+
+            var computeCommand = makeCommand(makeCommandOptions);
+            this._reprojectComputeCommands.push(computeCommand);
+        }
+    };
+
+    function makeCommand(makeCommandOptions) {
+        var imagery = makeCommandOptions.imagery;
+        return new ComputeCommand({
+            persists : true,
+            owner : this,
+            // Update render resources right before execution instead of now.
+            // This allows different ImageryLayers to share the same vao and buffers.
+            preExecute : function(command) {
+                reprojectFromArbitrary(command, makeCommandOptions);
+            },
+            postExecute : function(outputTexture) {
+                if (makeCommandOptions.final) {
+                    var projectedTextures = imagery.projectedTextures;
+                    var projectedTexturesLength = projectedTextures.length;
+                    for (var i = 0; i < projectedTexturesLength; i++) {
+                        projectedTextures[i].destroy();
+                    }
+
+                    makeCommandOptions.imageryLayer._finalizeReprojectTexture(makeCommandOptions.context, outputTexture);
+                    imagery.state = ImageryState.READY;
+                    imagery.projectedTextures.length = 0;
+                }
+                imagery.releaseReference();
+            }
+        });
+    }
+
+    var arbitraryUniformMap = {
+        u_textureDimensions : function() {
+            return this.textureDimensions;
+        },
+        u_texture : function() {
+            return this.texture;
+        },
+        u_westSouthInverseWidthHeight : function() {
+            return this.westSouthInverseWidthHeight;
+        },
+        westSouthInverseWidthHeight : new Cartesian4(),
+        textureDimensions : new Cartesian2(),
+        texture : undefined
+    };
+
+    function reprojectFromArbitrary(command, makeCommandOptions) {
+        var vertexArray = makeCommandOptions.vertexArray;
+        vertexArray.getAttribute(arbitraryReprojectAttributeIndices.projectedCoordinates).vertexBuffer.copyFromArrayView(makeCommandOptions.projectedCoordinates);
+
+        var texture = makeCommandOptions.projectedTexture;
+        var projectedRectangle = makeCommandOptions.projectedRectangle;
+
+        arbitraryUniformMap.textureDimensions.x = texture.width;
+        arbitraryUniformMap.textureDimensions.y = texture.height;
+        arbitraryUniformMap.texture = texture;
+
+        arbitraryUniformMap.westSouthInverseWidthHeight.x = projectedRectangle.west;
+        arbitraryUniformMap.westSouthInverseWidthHeight.y = projectedRectangle.south;
+        arbitraryUniformMap.westSouthInverseWidthHeight.z = 1.0 / projectedRectangle.width;
+        arbitraryUniformMap.westSouthInverseWidthHeight.w = 1.0 / projectedRectangle.height;
+
+        command.clear = false;
+        command.shaderProgram = makeCommandOptions.shaderProgram;
+        command.outputTexture = makeCommandOptions.outputTexture;
+        command.uniformMap = arbitraryUniformMap;
+        command.vertexArray = vertexArray;
+    }
 
     /**
      * Updates frame state to execute any queued texture re-projections.

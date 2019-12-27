@@ -26,6 +26,7 @@ import TileMapServiceImageryProvider from './TileMapServiceImageryProvider.js';
      * @param {Number} [options.tileHeight=256] Pixel height of image tiles.
      * @param {Boolean} [options.flipXY] Older versions of gdal2tiles.py flipped X and Y values in tilemapresource.xml.
      * Specifying this option will do the same, allowing for loading of these incorrect tilesets.
+     * @param {MapProjection} [options.mapProjection] MapProjection for the imagery. Required for TMS using a "raster" profile.
      * @returns {UrlTemplateImageryProvider} The imagery provider.
      *
      * @deprecated

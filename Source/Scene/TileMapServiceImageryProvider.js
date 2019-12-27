@@ -5,6 +5,7 @@ import defined from '../Core/defined.js';
 import DeveloperError from '../Core/DeveloperError.js';
 import GeographicProjection from '../Core/GeographicProjection.js';
 import GeographicTilingScheme from '../Core/GeographicTilingScheme.js';
+import ProjectedImageryTilingScheme from '../Core/ProjectedImageryTilingScheme.js';
 import Rectangle from '../Core/Rectangle.js';
 import Resource from '../Core/Resource.js';
 import RuntimeError from '../Core/RuntimeError.js';
@@ -39,6 +40,7 @@ import UrlTemplateImageryProvider from './UrlTemplateImageryProvider.js';
      * @param {Number} [options.tileHeight=256] Pixel height of image tiles.
      * @param {Boolean} [options.flipXY] Older versions of gdal2tiles.py flipped X and Y values in tilemapresource.xml.
      * Specifying this option will do the same, allowing for loading of these incorrect tilesets.
+     * @param {MapProjection} [options.mapProjection] MapProjection for the imagery. Required for TMS using a "raster" profile.
      * @returns {UrlTemplateImageryProvider} The imagery provider.
      *
      * @see ArcGisMapServerImageryProvider
@@ -118,7 +120,11 @@ import UrlTemplateImageryProvider from './UrlTemplateImageryProvider.js';
         var tileSetRegex = /tileset/i;
         var tileSetsRegex = /tilesets/i;
         var bboxRegex = /boundingbox/i;
-        var format, bbox, tilesets;
+        var originRegex = /origin/i;
+        var format;
+        var bbox;
+        var tilesets;
+        var origin;
         var tilesetsList = []; //list of TileSets
         var xmlResource = this._xmlResource;
         var metadataError = this._metadataError;
@@ -144,6 +150,8 @@ import UrlTemplateImageryProvider from './UrlTemplateImageryProvider.js';
                 }
             } else if (bboxRegex.test(nodeList.item(i).nodeName)) {
                 bbox = nodeList.item(i);
+            } else if (originRegex.test(nodeList.item(i).nodeName)) {
+                origin = nodeList.item(i);
             }
         }
 
@@ -172,8 +180,32 @@ import UrlTemplateImageryProvider from './UrlTemplateImageryProvider.js';
                 tilingScheme = new GeographicTilingScheme({ellipsoid : options.ellipsoid});
             } else if (tilingSchemeName === 'mercator' || tilingSchemeName === 'global-mercator') {
                 tilingScheme = new WebMercatorTilingScheme({ellipsoid : options.ellipsoid});
+            } else if (defined(options.mapProjection)) {
+                var west = Number.parseFloat(origin.getAttribute('x'));
+                var south = Number.parseFloat(origin.getAttribute('y'));
+
+                var width = Number.parseFloat(format.getAttribute('width'));
+                var height = Number.parseFloat(format.getAttribute('height'));
+                var unitsPerPixel = Number.parseFloat(tilesets.childNodes[1].getAttribute('units-per-pixel'));
+                var east = west + unitsPerPixel * width;
+                var north = south + unitsPerPixel * height;
+                var projectedRectangle = new Rectangle(west, south, east, north);
+
+                tilingScheme = new ProjectedImageryTilingScheme({
+                    mapProjection : options.mapProjection,
+                    projectedRectangle : projectedRectangle
+                });
+
+                if (!defined(options.rectangle)) {
+                    options.rectangle = Rectangle.approximateCartographicExtents({
+                        projectedRectangle : projectedRectangle,
+                        mapProjection : options.mapProjection,
+                        steps : Math.max(width, height)
+                    });
+                }
+
             } else {
-                message = xmlResource.url + 'specifies an unsupported profile attribute, ' + tilingSchemeName + '.';
+                message = xmlResource.url + 'specifies an unsupported profile attribute, ' + tilingSchemeName + ', or required parameters are missing.';
                 metadataError = TileProviderError.handleError(metadataError, this, this.errorEvent, message, undefined, undefined, undefined, requestMetadata);
                 if (!metadataError.retry) {
                     deferred.reject(new RuntimeError(message));

@@ -1,58 +1,57 @@
+import Check from '../Core/Check.js';
 import Credit from '../Core/Credit.js';
-import defaultValue from '../Core/defaultValue.js';
-import defined from '../Core/defined.js';
 import defineProperties from '../Core/defineProperties.js';
 import DeveloperError from '../Core/DeveloperError.js';
 import Event from '../Core/Event.js';
-import GeographicTilingScheme from '../Core/GeographicTilingScheme.js';
+import ProjectedImageryTilingScheme from '../Core/ProjectedImageryTilingScheme.js';
 import Rectangle from '../Core/Rectangle.js';
 import Resource from '../Core/Resource.js';
 import RuntimeError from '../Core/RuntimeError.js';
 import TileProviderError from '../Core/TileProviderError.js';
 import when from '../ThirdParty/when.js';
-import ImageryProvider from './ImageryProvider.js';
 
     /**
-     * Provides a single, top-level imagery tile.  The single image is assumed to use a
-     * {@link GeographicTilingScheme}.
+     * Provides a single, top-level imagery tile.  The single image may be in any projection.
      *
-     * @alias SingleTileImageryProvider
+     * @alias SingleTileProjectedImageryProvider
      * @constructor
      *
      * @param {Object} options Object with the following properties:
      * @param {Resource|String} options.url The url for the tile.
-     * @param {Rectangle} [options.rectangle=Rectangle.MAX_VALUE] The rectangle, in radians, covered by the image.
-     * @param {Credit|String} [options.credit] A credit for the data source, which is displayed on the canvas.
+     * @param {Rectangle} options.projectedRectangle The rectangle covered by the image in the source SRS.
+     * @param {MapProjection} options.mapProjection The map projection for the source SRS.
      * @param {Ellipsoid} [options.ellipsoid] The ellipsoid.  If not specified, the WGS84 ellipsoid is used.
+     * @param {Credit|String} [options.credit] A credit for the data source, which is displayed on the canvas.
      *
      * @see ArcGisMapServerImageryProvider
      * @see BingMapsImageryProvider
      * @see GoogleEarthEnterpriseMapsProvider
-     * @see SingleTileProjectedImageryProvider
-     * @see OpenStreetMapImageryProvider
-     * @see TileMapServiceImageryProvider
+     * @see createOpenStreetMapImageryProvider
+     * @see createTileMapServiceImageryProvider
+     * @see SingleTileImageryProvider
      * @see WebMapServiceImageryProvider
      * @see WebMapTileServiceImageryProvider
      * @see UrlTemplateImageryProvider
      */
-    function SingleTileImageryProvider(options) {
-        options = defaultValue(options, defaultValue.EMPTY_OBJECT);
+    function SingleTileProjectedImageryProvider(options) {
         //>>includeStart('debug', pragmas.debug);
-        if (!defined(options.url)) {
-            throw new DeveloperError('options.url is required.');
-        }
+        Check.defined('options', options);
+        Check.defined('options.url', options.url);
+        Check.defined('options.projectedRectangle', options.projectedRectangle);
+        Check.defined('options.mapProjection', options.mapProjection);
         //>>includeEnd('debug');
 
         var resource = Resource.createIfNeeded(options.url);
 
-        var rectangle = defaultValue(options.rectangle, Rectangle.MAX_VALUE);
-        var tilingScheme = new GeographicTilingScheme({
-            rectangle : rectangle,
+        var rectangle = Rectangle.clone(options.projectedRectangle);
+        this._tilingScheme = new ProjectedImageryTilingScheme({
+            projectedRectangle : rectangle,
+            mapProjection : options.mapProjection,
             numberOfLevelZeroTilesX : 1,
             numberOfLevelZeroTilesY : 1,
             ellipsoid : options.ellipsoid
         });
-        this._tilingScheme = tilingScheme;
+
         this._resource = resource;
         this._image = undefined;
         this._texture = undefined;
@@ -96,19 +95,16 @@ import ImageryProvider from './ImageryProvider.js';
         }
 
         function doRequest() {
-            ImageryProvider
-                .loadImage(null, resource)
-                .then(success)
-                .otherwise(failure);
+            when(resource.fetchImage(), success, failure);
         }
 
         doRequest();
     }
 
-    defineProperties(SingleTileImageryProvider.prototype, {
+    defineProperties(SingleTileProjectedImageryProvider.prototype, {
         /**
          * Gets the URL of the single, top-level imagery tile.
-         * @memberof SingleTileImageryProvider.prototype
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {String}
          * @readonly
          */
@@ -120,7 +116,7 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets the proxy used by this provider.
-         * @memberof SingleTileImageryProvider.prototype
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Proxy}
          * @readonly
          */
@@ -132,8 +128,8 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets the width of each tile, in pixels. This function should
-         * not be called before {@link SingleTileImageryProvider#ready} returns true.
-         * @memberof SingleTileImageryProvider.prototype
+         * not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Number}
          * @readonly
          */
@@ -151,8 +147,8 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets the height of each tile, in pixels.  This function should
-         * not be called before {@link SingleTileImageryProvider#ready} returns true.
-         * @memberof SingleTileImageryProvider.prototype
+         * not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Number}
          * @readonly
          */
@@ -170,8 +166,8 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets the maximum level-of-detail that can be requested.  This function should
-         * not be called before {@link SingleTileImageryProvider#ready} returns true.
-         * @memberof SingleTileImageryProvider.prototype
+         * not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Number}
          * @readonly
          */
@@ -189,8 +185,8 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets the minimum level-of-detail that can be requested.  This function should
-         * not be called before {@link SingleTileImageryProvider#ready} returns true.
-         * @memberof SingleTileImageryProvider.prototype
+         * not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Number}
          * @readonly
          */
@@ -208,8 +204,8 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets the tiling scheme used by this provider.  This function should
-         * not be called before {@link SingleTileImageryProvider#ready} returns true.
-         * @memberof SingleTileImageryProvider.prototype
+         * not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {TilingScheme}
          * @readonly
          */
@@ -227,8 +223,8 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets the rectangle, in radians, of the imagery provided by this instance.  This function should
-         * not be called before {@link SingleTileImageryProvider#ready} returns true.
-         * @memberof SingleTileImageryProvider.prototype
+         * not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Rectangle}
          * @readonly
          */
@@ -242,8 +238,8 @@ import ImageryProvider from './ImageryProvider.js';
          * Gets the tile discard policy.  If not undefined, the discard policy is responsible
          * for filtering out "missing" tiles via its shouldDiscardImage function.  If this function
          * returns undefined, no tiles are filtered.  This function should
-         * not be called before {@link SingleTileImageryProvider#ready} returns true.
-         * @memberof SingleTileImageryProvider.prototype
+         * not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {TileDiscardPolicy}
          * @readonly
          */
@@ -263,7 +259,7 @@ import ImageryProvider from './ImageryProvider.js';
          * Gets an event that is raised when the imagery provider encounters an asynchronous error.  By subscribing
          * to the event, you will be notified of the error and can potentially recover from it.  Event listeners
          * are passed an instance of {@link TileProviderError}.
-         * @memberof SingleTileImageryProvider.prototype
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Event}
          * @readonly
          */
@@ -275,7 +271,7 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets a value indicating whether or not the provider is ready for use.
-         * @memberof SingleTileImageryProvider.prototype
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Boolean}
          * @readonly
          */
@@ -287,7 +283,7 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets a promise that resolves to true when the provider is ready for use.
-         * @memberof SingleTileImageryProvider.prototype
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Promise.<Boolean>}
          * @readonly
          */
@@ -299,8 +295,8 @@ import ImageryProvider from './ImageryProvider.js';
 
         /**
          * Gets the credit to display when this imagery provider is active.  Typically this is used to credit
-         * the source of the imagery.  This function should not be called before {@link SingleTileImageryProvider#ready} returns true.
-         * @memberof SingleTileImageryProvider.prototype
+         * the source of the imagery.  This function should not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Credit}
          * @readonly
          */
@@ -316,7 +312,7 @@ import ImageryProvider from './ImageryProvider.js';
          * be ignored.  If this property is true, any images without an alpha channel will be treated
          * as if their alpha is 1.0 everywhere.  When this property is false, memory usage
          * and texture upload time are reduced.
-         * @memberof SingleTileImageryProvider.prototype
+         * @memberof SingleTileProjectedImageryProvider.prototype
          * @type {Boolean}
          * @readonly
          */
@@ -337,13 +333,13 @@ import ImageryProvider from './ImageryProvider.js';
      *
      * @exception {DeveloperError} <code>getTileCredits</code> must not be called before the imagery provider is ready.
      */
-    SingleTileImageryProvider.prototype.getTileCredits = function(x, y, level) {
+    SingleTileProjectedImageryProvider.prototype.getTileCredits = function(x, y, level) {
         return undefined;
     };
 
     /**
      * Requests the image for a given tile.  This function should
-     * not be called before {@link SingleTileImageryProvider#ready} returns true.
+     * not be called before {@link SingleTileProjectedImageryProvider#ready} returns true.
      *
      * @param {Number} x The tile X coordinate.
      * @param {Number} y The tile Y coordinate.
@@ -356,7 +352,7 @@ import ImageryProvider from './ImageryProvider.js';
      *
      * @exception {DeveloperError} <code>requestImage</code> must not be called before the imagery provider is ready.
      */
-    SingleTileImageryProvider.prototype.requestImage = function(x, y, level, request) {
+    SingleTileProjectedImageryProvider.prototype.requestImage = function(x, y, level, request) {
         //>>includeStart('debug', pragmas.debug);
         if (!this._ready) {
             throw new DeveloperError('requestImage must not be called before the imagery provider is ready.');
@@ -380,7 +376,8 @@ import ImageryProvider from './ImageryProvider.js';
      *                   instances.  The array may be empty if no features are found at the given location.
      *                   It may also be undefined if picking is not supported.
      */
-    SingleTileImageryProvider.prototype.pickFeatures = function(x, y, level, longitude, latitude) {
+    SingleTileProjectedImageryProvider.prototype.pickFeatures = function(x, y, level, longitude, latitude) {
         return undefined;
     };
-export default SingleTileImageryProvider;
+
+export default SingleTileProjectedImageryProvider;

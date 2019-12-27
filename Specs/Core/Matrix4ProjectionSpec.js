@@ -4,6 +4,7 @@ import { Cartesian3 } from '../../Source/Cesium.js';
 import { Cartographic } from '../../Source/Cesium.js';
 import { Ellipsoid } from '../../Source/Cesium.js';
 import { Math as CesiumMath } from '../../Source/Cesium.js';
+import { Rectangle } from '../../Source/Cesium.js';
 
 describe('Core/Matrix4Projection', function() {
 
@@ -120,6 +121,30 @@ describe('Core/Matrix4Projection', function() {
         expect(Cartographic.equalsEpsilon(result, cartographic, CesiumMath.EPSILON10)).toBe(true);
     });
 
+    it('clamps cartographic coordinates to the specified wgs84 bounds', function() {
+        var projection = new Matrix4Projection({
+            matrix : Matrix4.IDENTITY,
+            wgs84Bounds : Rectangle.fromDegrees(-180, -90, 180, 45)
+        });
+
+        var edgeProjected = projection.project(Cartographic.fromDegrees(0, 45, 0));
+        var clampedProjected = projection.project(Cartographic.fromDegrees(0, 50, 0));
+
+        expect(edgeProjected).toEqualEpsilon(clampedProjected, CesiumMath.EPSILON8);
+    });
+
+    it('clamps projected coordinates to the specified projected bounds', function() {
+        var projection = new Matrix4Projection({
+            matrix : Matrix4.IDENTITY,
+            projectedBounds : new Rectangle(-180, -90, 180, 45)
+        });
+
+        var unprojected = projection.unproject(new Cartesian3(-180, 0.0, 0.0));
+        var clampedUnprojected = projection.unproject(new Cartesian3(-190, 0.0, 0.0));
+
+        expect(clampedUnprojected).toEqualEpsilon(unprojected, CesiumMath.EPSILON8);
+    });
+
     it('project throws without cartographic', function() {
         var projection = new Matrix4Projection({
             matrix : Matrix4.IDENTITY
@@ -142,7 +167,9 @@ describe('Core/Matrix4Projection', function() {
         var projection = new Matrix4Projection({
             matrix : Matrix4.IDENTITY,
             ellipsoid : Ellipsoid.UNIT_SPHERE,
-            degrees : false
+            degrees : false,
+            projectedBounds : new Rectangle(-180, -90, 180, 45),
+            wgs84Bounds : Rectangle.fromDegrees(-180, -90, 180, 45)
         });
         var serialized = projection.serialize();
 
@@ -150,6 +177,8 @@ describe('Core/Matrix4Projection', function() {
             expect(projection.matrix).toEqual(deserializedProjection.matrix);
             expect(projection.ellipsoid.equals(deserializedProjection.ellipsoid)).toBe(true);
             expect(projection.degrees).toEqual(deserializedProjection.degrees);
+            expect(projection.projectedBounds).toEqual(deserializedProjection.projectedBounds);
+            expect(projection.wgs84Bounds).toEqual(deserializedProjection.wgs84Bounds);
         });
     });
 });

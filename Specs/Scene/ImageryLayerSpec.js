@@ -14,6 +14,7 @@ import { ImageryLayer } from '../../Source/Cesium.js';
 import { ImageryLayerCollection } from '../../Source/Cesium.js';
 import { ImageryState } from '../../Source/Cesium.js';
 import { NeverTileDiscardPolicy } from '../../Source/Cesium.js';
+import { Proj4Projection } from '../../Source/Cesium.js';
 import { QuadtreeTile } from '../../Source/Cesium.js';
 import { SingleTileImageryProvider } from '../../Source/Cesium.js';
 import { UrlTemplateImageryProvider } from '../../Source/Cesium.js';
@@ -56,7 +57,7 @@ describe('Scene/ImageryLayer', function() {
         return this.shouldDiscard;
     };
 
-    it('discards tiles when the ImageryProviders discard policy says to do so', function() {
+    it('discards tiles when the ImageryProvider\'s discard policy says to do so', function() {
         Resource._Implementations.createImage = function(url, crossOrigin, deferred) {
             Resource._DefaultImplementations.createImage('Data/Images/Red16x16.png', crossOrigin, deferred);
         };
@@ -88,6 +89,44 @@ describe('Scene/ImageryLayer', function() {
                 return imagery.state === ImageryState.RECEIVED;
             }).then(function() {
                 layer._createTexture(scene.context, imagery);
+                expect(imagery.state).toEqual(ImageryState.INVALID);
+                imagery.releaseReference();
+            });
+        });
+    });
+
+    it('discards tiles generated from images in arbitrary projections when the ImageryProvider\'s discard policy says to do so', function() {
+        var epsg3031wkt = '+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs';
+        var epsg3031Bounds = Rectangle.fromDegrees(-180.0000, -90.0000, 180.0000, -60.0000);
+        var epsg3031mapProjection = new Proj4Projection({
+            wellKnownText : epsg3031wkt,
+            wgs84Bounds : epsg3031Bounds
+        });
+
+        var discardPolicy = new CustomDiscardPolicy();
+
+        var provider = new TileMapServiceImageryProvider({
+            url : 'Data/TMS/LIMAportion',
+            mapProjection : epsg3031mapProjection,
+            tileDiscardPolicy : discardPolicy
+        });
+        var layer = new ImageryLayer(provider);
+
+        return pollToPromise(function() {
+            return provider.ready;
+        }).then(function() {
+            discardPolicy.shouldDiscard = true;
+
+            var imagery = new Imagery(layer, 0, 0, 0);
+            imagery.addReference();
+            imagery.projectedRectangles[0] = epsg3031Bounds;
+            layer._requestProjectedImages(imagery, [0, 0], 0, 0);
+            RequestScheduler.update();
+
+            return pollToPromise(function() {
+                return imagery.state === ImageryState.RECEIVED;
+            }).then(function() {
+                layer._createMultipleTextures(scene.context, imagery);
                 expect(imagery.state).toEqual(ImageryState.INVALID);
                 imagery.releaseReference();
             });
@@ -168,6 +207,55 @@ describe('Scene/ImageryLayer', function() {
                         expect(imagery.texture.sampler.minificationFilter).toEqual(TextureMinificationFilter.LINEAR_MIPMAP_LINEAR);
                         expect(imagery.texture.sampler.magnificationFilter).toEqual(TextureMinificationFilter.LINEAR);
                         expect(textureBeforeReprojection).not.toEqual(imagery.texture);
+                        imagery.releaseReference();
+                    });
+                });
+            });
+        });
+    });
+
+    it('reprojects images from arbitrary projections', function() {
+        var epsg3031wkt = '+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs';
+        var epsg3031Bounds = Rectangle.fromDegrees(-180.0000, -90.0000, 180.0000, -60.0000);
+        var epsg3031mapProjection = new Proj4Projection({
+            wellKnownText : epsg3031wkt,
+            wgs84Bounds : epsg3031Bounds
+        });
+
+        var provider = new TileMapServiceImageryProvider({
+            url : 'Data/TMS/LIMAportion',
+            mapProjection : epsg3031mapProjection
+        });
+        var layer = new ImageryLayer(provider);
+
+        return pollToPromise(function() {
+            return provider.ready;
+        }).then(function() {
+            var imagery = new Imagery(layer, 0, 0, 0);
+            imagery.addReference();
+            imagery.projectedRectangles[0] = epsg3031Bounds;
+            layer._requestProjectedImages(imagery, [0, 0], 0, 0);
+            RequestScheduler.update();
+
+            return pollToPromise(function() {
+                return imagery.state === ImageryState.RECEIVED;
+            }).then(function() {
+                layer._createMultipleTextures(scene.context, imagery);
+
+                return pollToPromise(function() {
+                    return imagery.state === ImageryState.TEXTURE_LOADED;
+                }).then(function() {
+                    layer._multisourceReprojectTexture(scene.frameState, imagery);
+                    layer.queueReprojectionCommands(scene.frameState);
+                    scene.frameState.commandList[0].execute(computeEngine);
+
+                    return pollToPromise(function() {
+                        return imagery.state === ImageryState.READY;
+                    }).then(function() {
+                        expect(imagery.texture).toBeDefined();
+                        expect(imagery.texture.sampler).toBeDefined();
+                        expect(imagery.texture.sampler.minificationFilter).toEqual(TextureMinificationFilter.LINEAR_MIPMAP_LINEAR);
+                        expect(imagery.texture.sampler.magnificationFilter).toEqual(TextureMinificationFilter.LINEAR);
                         imagery.releaseReference();
                     });
                 });
