@@ -2648,6 +2648,8 @@ import View from './View.js';
         }
     };
 
+    var scratchVRFrustum = new PerspectiveOffCenterFrustum();
+
     function executeWebVRCommands(scene, passState, backgroundColor) {
         var view = scene._view;
         var camera = view.camera;
@@ -2678,23 +2680,48 @@ import View from './View.js';
         savedCamera.frustum = camera.frustum;
 
         var near = camera.frustum.near;
+        var far = camera.frustum.far;
         var fo = near * defaultValue(scene.focalLength, 5.0);
         var eyeSeparation = defaultValue(scene.eyeSeparation, fo / 30.0);
         var eyeTranslation = Cartesian3.multiplyByScalar(savedCamera.right, eyeSeparation * 0.5, scratchEyeTranslation);
 
-        camera.frustum.aspectRatio = viewport.width / viewport.height;
-
+        var aspectRatio = camera.frustum.aspectRatio = viewport.width / viewport.height;
+        var widthOverTwo = near * Math.tan(camera.frustum.fov / 2.0);
         var offset = 0.5 * eyeSeparation * near / fo;
 
         Cartesian3.add(savedCamera.position, eyeTranslation, camera.position);
-        camera.frustum.xOffset = offset;
+
+        var left = -aspectRatio * widthOverTwo - offset;
+        var right = aspectRatio * widthOverTwo - offset;
+        var top = widthOverTwo;
+        var bottom = -widthOverTwo;
+
+        var vrFrustum = camera.frustum = scratchVRFrustum;
+
+        vrFrustum.left = left;
+        vrFrustum.right = right;
+        vrFrustum.top = top;
+        vrFrustum.bottom = bottom;
+        vrFrustum.near = near;
+        vrFrustum.far = far;
 
         executeCommands(scene, passState);
 
         viewport.x = viewport.width;
 
         Cartesian3.subtract(savedCamera.position, eyeTranslation, camera.position);
-        camera.frustum.xOffset = -offset;
+
+        left = -aspectRatio * widthOverTwo + offset;
+        right = aspectRatio * widthOverTwo + offset;
+        top = widthOverTwo;
+        bottom = -widthOverTwo;
+
+        vrFrustum.left = left;
+        vrFrustum.right = right;
+        vrFrustum.top = top;
+        vrFrustum.bottom = bottom;
+        vrFrustum.near = near;
+        vrFrustum.far = far;
 
         executeCommands(scene, passState);
 
