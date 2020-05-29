@@ -616,7 +616,7 @@ beforeAll(function () {
     })
   );
 
-  return when.all(modelPromises);
+  return Promise.all(modelPromises);
 });
 ```
 
@@ -676,7 +676,7 @@ it("rejects readyPromise on error", function () {
     .then(function () {
       fail("should not resolve");
     })
-    .otherwise(function (e) {
+    .catch(function (e) {
       expect(e.message).toContain(baseUrl);
       expect(provider.ready).toBe(false);
     });

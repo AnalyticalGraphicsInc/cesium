@@ -4,6 +4,7 @@ import Cartographic from "../Core/Cartographic.js";
 import Color from "../Core/Color.js";
 import createGuid from "../Core/createGuid.js";
 import defaultValue from "../Core/defaultValue.js";
+import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import DeveloperError from "../Core/DeveloperError.js";
 import Ellipsoid from "../Core/Ellipsoid.js";
@@ -19,7 +20,6 @@ import TimeIntervalCollection from "../Core/TimeIntervalCollection.js";
 import HeightReference from "../Scene/HeightReference.js";
 import HorizontalOrigin from "../Scene/HorizontalOrigin.js";
 import VerticalOrigin from "../Scene/VerticalOrigin.js";
-import when from "../ThirdParty/when.js";
 import zip from "../ThirdParty/zip.js";
 import BillboardGraphics from "./BillboardGraphics.js";
 import CompositePositionProperty from "./CompositePositionProperty.js";
@@ -72,7 +72,7 @@ ExternalFileHandler.prototype.texture = function (texture) {
   }
 
   if (texture instanceof HTMLCanvasElement) {
-    var deferred = when.defer();
+    var deferred = defer();
     this._promises.push(deferred.promise);
 
     filename = "texture_" + ++this._count + ".png";
@@ -107,7 +107,7 @@ ExternalFileHandler.prototype.model = function (model, time) {
   // Iterate through external files and add them to our list once the promise resolves
   for (var filename in externalFiles) {
     if (externalFiles.hasOwnProperty(filename)) {
-      var promise = when(externalFiles[filename]);
+      var promise = Promise.resolve(externalFiles[filename]);
       this._promises.push(promise);
 
       promise.then(getModelBlobHander(this, filename));
@@ -120,7 +120,7 @@ ExternalFileHandler.prototype.model = function (model, time) {
 Object.defineProperties(ExternalFileHandler.prototype, {
   promise: {
     get: function () {
-      return when.all(this._promises);
+      return Promise.all(this._promises);
     },
   },
   files: {
@@ -310,7 +310,7 @@ function exportKml(options) {
 }
 
 function createKmz(kmlString, externalFiles) {
-  var deferred = when.defer();
+  var deferred = defer();
   zip.createWriter(new zip.BlobWriter(), function (writer) {
     // We need to only write one file at a time so the zip doesn't get corrupted
     addKmlToZip(writer, kmlString)
@@ -331,7 +331,7 @@ function createKmz(kmlString, externalFiles) {
 }
 
 function addKmlToZip(writer, kmlString) {
-  var deferred = when.defer();
+  var deferred = defer();
   writer.add("doc.kml", new zip.TextReader(kmlString), function () {
     deferred.resolve();
   });
@@ -346,7 +346,7 @@ function addExternalFilesToZip(writer, keys, externalFiles, index) {
 
   var filename = keys[index];
 
-  var deferred = when.defer();
+  var deferred = defer();
   writer.add(
     filename,
     new zip.BlobReader(externalFiles[filename]),

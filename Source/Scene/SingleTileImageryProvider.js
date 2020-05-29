@@ -1,5 +1,6 @@
 import Credit from "../Core/Credit.js";
 import defaultValue from "../Core/defaultValue.js";
+import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import DeveloperError from "../Core/DeveloperError.js";
 import Event from "../Core/Event.js";
@@ -8,7 +9,6 @@ import Rectangle from "../Core/Rectangle.js";
 import Resource from "../Core/Resource.js";
 import RuntimeError from "../Core/RuntimeError.js";
 import TileProviderError from "../Core/TileProviderError.js";
-import when from "../ThirdParty/when.js";
 import ImageryProvider from "./ImageryProvider.js";
 
 /**
@@ -60,7 +60,7 @@ function SingleTileImageryProvider(options) {
   this._errorEvent = new Event();
 
   this._ready = false;
-  this._readyPromise = when.defer();
+  this._readyPromise = defer();
 
   var credit = options.credit;
   if (typeof credit === "string") {
@@ -97,7 +97,7 @@ function SingleTileImageryProvider(options) {
   }
 
   function doRequest() {
-    ImageryProvider.loadImage(null, resource).then(success).otherwise(failure);
+    ImageryProvider.loadImage(null, resource).then(success).catch(failure);
   }
 
   doRequest();

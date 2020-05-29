@@ -1,6 +1,6 @@
-import when from "../ThirdParty/when.js";
 import buildModuleUrl from "./buildModuleUrl.js";
 import defaultValue from "./defaultValue.js";
+import defer from "./defer.js";
 import defined from "./defined.js";
 import destroyObject from "./destroyObject.js";
 import DeveloperError from "./DeveloperError.js";
@@ -35,7 +35,7 @@ function canTransferArrayBuffer() {
       return TaskProcessor._canTransferArrayBuffer;
     }
 
-    var deferred = when.defer();
+    var deferred = defer();
 
     worker.onmessage = function (event) {
       var array = event.data.array;
@@ -170,7 +170,7 @@ function getWebAssemblyLoaderConfig(processor, wasmOptions) {
     }
 
     config.modulePath = buildModuleUrl(wasmOptions.fallbackModulePath);
-    return when.resolve(config);
+    return Promise.resolve(config);
   }
 
   config.modulePath = buildModuleUrl(wasmOptions.modulePath);
@@ -230,7 +230,7 @@ var emptyTransferableObjectArray = [];
  * if (!Cesium.defined(promise)) {
  *     // too many active tasks - try again later
  * } else {
- *     Cesium.when(promise, function(result) {
+ *     promise.then(function(result) {
  *         // use the result of the task
  *     });
  * }
@@ -250,7 +250,9 @@ TaskProcessor.prototype.scheduleTask = function (
   ++this._activeTasks;
 
   var processor = this;
-  return when(canTransferArrayBuffer(), function (canTransferArrayBuffer) {
+  return Promise.resolve(canTransferArrayBuffer()).then(function (
+    canTransferArrayBuffer
+  ) {
     if (!defined(transferableObjects)) {
       transferableObjects = emptyTransferableObjectArray;
     } else if (!canTransferArrayBuffer) {
@@ -258,7 +260,7 @@ TaskProcessor.prototype.scheduleTask = function (
     }
 
     var id = processor._nextID++;
-    var deferred = when.defer();
+    var deferred = defer();
     processor._deferreds[id] = deferred;
 
     processor._worker.postMessage(
@@ -290,13 +292,15 @@ TaskProcessor.prototype.initWebAssemblyModule = function (webAssemblyOptions) {
     this._worker = createWorker(this);
   }
 
-  var deferred = when.defer();
+  var deferred = defer();
   var processor = this;
   var worker = this._worker;
   getWebAssemblyLoaderConfig(this, webAssemblyOptions).then(function (
     wasmConfig
   ) {
-    return when(canTransferArrayBuffer(), function (canTransferArrayBuffer) {
+    return Promise.resolve(canTransferArrayBuffer()).then(function (
+      canTransferArrayBuffer
+    ) {
       var transferableObjects;
       var binary = wasmConfig.wasmBinary;
       if (defined(binary) && canTransferArrayBuffer) {
@@ -318,7 +322,7 @@ TaskProcessor.prototype.initWebAssemblyModule = function (webAssemblyOptions) {
     });
   });
 
-  return deferred;
+  return deferred.promise;
 };
 
 /**

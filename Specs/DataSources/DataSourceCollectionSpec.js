@@ -1,6 +1,6 @@
+import { defer } from "../../Source/Cesium.js";
 import { DataSourceCollection } from "../../Source/Cesium.js";
 import MockDataSource from "../MockDataSource.js";
-import { when } from "../../Source/Cesium.js";
 
 describe("DataSources/DataSourceCollection", function () {
   it("contains, get, getLength, and indexOf work", function () {
@@ -100,7 +100,7 @@ describe("DataSources/DataSourceCollection", function () {
   });
 
   it("add works with promise", function () {
-    var promise = when.defer();
+    var promise = defer();
     var source = new MockDataSource();
     var collection = new DataSourceCollection();
 
@@ -117,7 +117,7 @@ describe("DataSources/DataSourceCollection", function () {
   });
 
   it("promise does not get added if not resolved before removeAll", function () {
-    var promise = when.defer();
+    var promise = defer();
     var source = new MockDataSource();
     var collection = new DataSourceCollection();
 

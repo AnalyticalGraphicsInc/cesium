@@ -2,7 +2,6 @@ import { Cartesian3 } from "../../Source/Cesium.js";
 import { GeocodeType } from "../../Source/Cesium.js";
 import { PeliasGeocoderService } from "../../Source/Cesium.js";
 import { Resource } from "../../Source/Cesium.js";
-import { when } from "../../Source/Cesium.js";
 
 describe("Core/PeliasGeocoderService", function () {
   it("constructor throws without url", function () {
@@ -29,7 +28,9 @@ describe("Core/PeliasGeocoderService", function () {
         },
       ],
     };
-    spyOn(Resource.prototype, "fetchJson").and.returnValue(when.resolve(data));
+    spyOn(Resource.prototype, "fetchJson").and.returnValue(
+      Promise.resolve(data)
+    );
 
     return service.geocode(query).then(function (results) {
       expect(results.length).toEqual(1);
@@ -43,7 +44,9 @@ describe("Core/PeliasGeocoderService", function () {
 
     var query = "some query";
     var data = { features: [] };
-    spyOn(Resource.prototype, "fetchJson").and.returnValue(when.resolve(data));
+    spyOn(Resource.prototype, "fetchJson").and.returnValue(
+      Promise.resolve(data)
+    );
 
     return service.geocode(query).then(function (results) {
       expect(results.length).toEqual(0);
@@ -55,7 +58,9 @@ describe("Core/PeliasGeocoderService", function () {
 
     var query = "some query";
     var data = { features: [] };
-    spyOn(Resource.prototype, "fetchJson").and.returnValue(when.resolve(data));
+    spyOn(Resource.prototype, "fetchJson").and.returnValue(
+      Promise.resolve(data)
+    );
     var getDerivedResource = spyOn(
       service._url,
       "getDerivedResource"
@@ -75,7 +80,9 @@ describe("Core/PeliasGeocoderService", function () {
 
     var query = "some query";
     var data = { features: [] };
-    spyOn(Resource.prototype, "fetchJson").and.returnValue(when.resolve(data));
+    spyOn(Resource.prototype, "fetchJson").and.returnValue(
+      Promise.resolve(data)
+    );
     var getDerivedResource = spyOn(
       service._url,
       "getDerivedResource"

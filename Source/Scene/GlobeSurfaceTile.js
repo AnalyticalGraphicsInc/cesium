@@ -20,7 +20,6 @@ import TextureMagnificationFilter from "../Renderer/TextureMagnificationFilter.j
 import TextureMinificationFilter from "../Renderer/TextureMinificationFilter.js";
 import TextureWrap from "../Renderer/TextureWrap.js";
 import VertexArray from "../Renderer/VertexArray.js";
-import when from "../ThirdParty/when.js";
 import ImageryState from "./ImageryState.js";
 import QuadtreeTileLoadState from "./QuadtreeTileLoadState.js";
 import SceneMode from "./SceneMode.js";
@@ -544,16 +543,14 @@ function upsample(surfaceTile, tile, frameState, terrainProvider, x, y, level) {
 
   surfaceTile.terrainState = TerrainState.RECEIVING;
 
-  when(
-    terrainDataPromise,
-    function (terrainData) {
+  Promise.resolve(terrainDataPromise)
+    .then(function (terrainData) {
       surfaceTile.terrainData = terrainData;
       surfaceTile.terrainState = TerrainState.RECEIVED;
-    },
-    function () {
+    })
+    .catch(function () {
       surfaceTile.terrainState = TerrainState.FAILED;
-    }
-  );
+    });
 }
 
 function requestTileGeometry(surfaceTile, terrainProvider, x, y, level) {
@@ -616,7 +613,7 @@ function requestTileGeometry(surfaceTile, terrainProvider, x, y, level) {
     // has been deferred.
     if (defined(requestPromise)) {
       surfaceTile.terrainState = TerrainState.RECEIVING;
-      when(requestPromise, success, failure);
+      Promise.resolve(requestPromise).then(success).catch(failure);
     } else {
       // Deferred - try again later.
       surfaceTile.terrainState = TerrainState.UNLOADED;
@@ -646,9 +643,8 @@ function transform(surfaceTile, frameState, terrainProvider, x, y, level) {
 
   surfaceTile.terrainState = TerrainState.TRANSFORMING;
 
-  when(
-    meshPromise,
-    function (mesh) {
+  Promise.resolve(meshPromise)
+    .then(function (mesh) {
       surfaceTile.mesh = mesh;
       surfaceTile.orientedBoundingBox = OrientedBoundingBox.clone(
         mesh.orientedBoundingBox,
@@ -659,11 +655,10 @@ function transform(surfaceTile, frameState, terrainProvider, x, y, level) {
         surfaceTile.occludeePointInScaledSpace
       );
       surfaceTile.terrainState = TerrainState.TRANSFORMED;
-    },
-    function () {
+    })
+    .catch(function () {
       surfaceTile.terrainState = TerrainState.FAILED;
-    }
-  );
+    });
 }
 
 GlobeSurfaceTile._createVertexArrayForMesh = function (context, mesh) {

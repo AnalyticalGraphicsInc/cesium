@@ -4,6 +4,7 @@ import TerrainTileProcessor from "../TerrainTileProcessor.js";
 import { Cartesian3 } from "../../Source/Cesium.js";
 import { Cartesian4 } from "../../Source/Cesium.js";
 import { createWorldTerrain } from "../../Source/Cesium.js";
+import { defer } from "../../Source/Cesium.js";
 import { Ellipsoid } from "../../Source/Cesium.js";
 import { EllipsoidTerrainProvider } from "../../Source/Cesium.js";
 import { GeographicTilingScheme } from "../../Source/Cesium.js";
@@ -14,7 +15,6 @@ import { QuadtreeTile } from "../../Source/Cesium.js";
 import { QuadtreeTileLoadState } from "../../Source/Cesium.js";
 import { TerrainState } from "../../Source/Cesium.js";
 import createScene from "../createScene.js";
-import { when } from "../../Source/Cesium.js";
 
 describe("Scene/GlobeSurfaceTile", function () {
   var frameState;
@@ -445,7 +445,7 @@ describe("Scene/GlobeSurfaceTile", function () {
     });
 
     it("returns false when RECEIVING", function () {
-      var deferred = when.defer();
+      var deferred = defer();
 
       mockTerrain
         .requestTileGeometryWillSucceed(rootTile)
@@ -458,7 +458,7 @@ describe("Scene/GlobeSurfaceTile", function () {
     });
 
     it("returns false when TRANSFORMING", function () {
-      var deferred = when.defer();
+      var deferred = defer();
 
       mockTerrain
         .requestTileGeometryWillSucceed(rootTile)
@@ -472,7 +472,7 @@ describe("Scene/GlobeSurfaceTile", function () {
     });
 
     it("returns false when imagery is TRANSITIONING", function () {
-      var deferred = when.defer();
+      var deferred = defer();
 
       var mockImagery = new MockImageryProvider();
       imageryLayerCollection.addImageryProvider(mockImagery);

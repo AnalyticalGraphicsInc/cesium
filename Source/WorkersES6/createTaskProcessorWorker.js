@@ -1,7 +1,6 @@
 import defaultValue from "../Core/defaultValue.js";
 import defined from "../Core/defined.js";
 import formatError from "../Core/formatError.js";
-import when from "../ThirdParty/when.js";
 
 // createXXXGeometry functions may return Geometry or a Promise that resolves to Geometry
 // if the function requires access to ApproximateTerrainHeights.
@@ -13,7 +12,7 @@ function callAndWrap(workerFunction, parameters, transferableObjects) {
     resultOrPromise = workerFunction(parameters, transferableObjects);
     return resultOrPromise; // errors handled by Promise
   } catch (e) {
-    return when.reject(e);
+    return Promise.reject(e);
   }
 }
 
@@ -55,13 +54,13 @@ function createTaskProcessorWorker(workerFunction) {
       error: undefined,
     };
 
-    return when(
+    return Promise.resolve(
       callAndWrap(workerFunction, data.parameters, transferableObjects)
     )
       .then(function (result) {
         responseMessage.result = result;
       })
-      .otherwise(function (e) {
+      .catch(function (e) {
         if (e instanceof Error) {
           // Errors can't be posted in a message, copy the properties
           responseMessage.error = {
@@ -73,7 +72,7 @@ function createTaskProcessorWorker(workerFunction) {
           responseMessage.error = e;
         }
       })
-      .always(function () {
+      .finally(function () {
         if (!defined(postMessage)) {
           postMessage = defaultValue(self.webkitPostMessage, self.postMessage);
         }

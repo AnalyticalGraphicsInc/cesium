@@ -19,7 +19,6 @@ import Cesium3DTilesTester from "../Cesium3DTilesTester.js";
 import createCanvas from "../createCanvas.js";
 import createScene from "../createScene.js";
 import pollToPromise from "../pollToPromise.js";
-import { when } from "../../Source/Cesium.js";
 
 describe(
   "Scene/PointCloud3DTileContent",
@@ -316,7 +315,7 @@ describe(
       }).then(function () {
         var decoder = DracoLoader._getDecoderTaskProcessor();
         spyOn(decoder, "scheduleTask").and.returnValue(
-          when.reject({ message: "my error" })
+          Promise.reject({ message: "my error" })
         );
         return Cesium3DTilesTester.loadTileset(scene, pointCloudDracoUrl).then(
           function (tileset) {
@@ -325,7 +324,7 @@ describe(
               .then(function () {
                 fail("should not resolve");
               })
-              .otherwise(function (error) {
+              .catch(function (error) {
                 expect(error.message).toBe("my error");
               });
           }
@@ -890,16 +889,18 @@ describe(
     });
 
     it("throws if style references the NORMAL semantic but the point cloud does not have per-point normals", function () {
-      return Cesium3DTilesTester.loadTileset(scene, pointCloudRGBUrl).then(
-        function (tileset) {
+      return Cesium3DTilesTester.loadTileset(scene, pointCloudRGBUrl)
+        .then(function (tileset) {
           tileset.style = new Cesium3DTileStyle({
             color: "${NORMAL}[0] > 0.5",
           });
+          return tileset.style.readyPromise;
+        })
+        .then(function () {
           expect(function () {
             scene.renderForSpecs();
           }).toThrowRuntimeError();
-        }
-      );
+        });
     });
 
     it("throws when shader style reference a non-existent property", function () {
@@ -967,7 +968,7 @@ describe(
         1000 * 11, // 3 shorts (quantized xyz), 3 bytes (rgb), 2 bytes (oct-encoded normal)
       ];
 
-      return when.all(promises).then(function (tilesets) {
+      return Promise.all(promises).then(function (tilesets) {
         var length = tilesets.length;
         for (var i = 0; i < length; ++i) {
           var content = tilesets[i].root.content;

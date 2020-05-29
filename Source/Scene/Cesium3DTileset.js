@@ -5,6 +5,7 @@ import Cartographic from "../Core/Cartographic.js";
 import Check from "../Core/Check.js";
 import Credit from "../Core/Credit.js";
 import defaultValue from "../Core/defaultValue.js";
+import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import deprecationWarning from "../Core/deprecationWarning.js";
 import destroyObject from "../Core/destroyObject.js";
@@ -21,7 +22,6 @@ import Transforms from "../Core/Transforms.js";
 import ClearCommand from "../Renderer/ClearCommand.js";
 import Pass from "../Renderer/Pass.js";
 import RenderState from "../Renderer/RenderState.js";
-import when from "../ThirdParty/when.js";
 import Axis from "./Axis.js";
 import Cesium3DTile from "./Cesium3DTile.js";
 import Cesium3DTileColorBlendMode from "./Cesium3DTileColorBlendMode.js";
@@ -261,7 +261,7 @@ function Cesium3DTileset(options) {
 
   this._tileDebugLabels = undefined;
 
-  this._readyPromise = when.defer();
+  this._readyPromise = defer();
 
   this._classificationType = options.classificationType;
 
@@ -888,7 +888,7 @@ function Cesium3DTileset(options) {
 
   var that = this;
   var resource;
-  when(options.url)
+  Promise.resolve(options.url)
     .then(function (url) {
       var basePath;
       resource = Resource.createIfNeeded(url);
@@ -967,7 +967,7 @@ function Cesium3DTileset(options) {
       );
       that._readyPromise.resolve(that);
     })
-    .otherwise(function (error) {
+    .catch(function (error) {
       that._readyPromise.reject(error);
     });
 }
@@ -1862,7 +1862,7 @@ function requestContent(tileset, tile) {
   tile.contentReadyToProcessPromise.then(addToProcessingQueue(tileset, tile));
   tile.contentReadyPromise
     .then(handleTileSuccess(tileset, tile))
-    .otherwise(handleTileFailure(tileset, tile));
+    .catch(handleTileFailure(tileset, tile));
 }
 
 function sortRequestByPriority(a, b) {

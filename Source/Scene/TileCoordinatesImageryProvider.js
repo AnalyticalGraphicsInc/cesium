@@ -3,7 +3,6 @@ import defaultValue from "../Core/defaultValue.js";
 import defined from "../Core/defined.js";
 import Event from "../Core/Event.js";
 import GeographicTilingScheme from "../Core/GeographicTilingScheme.js";
-import when from "../ThirdParty/when.js";
 
 /**
  * An {@link ImageryProvider} that draws a box around every rendered tile in the tiling scheme, and draws
@@ -32,7 +31,7 @@ function TileCoordinatesImageryProvider(options) {
   this._errorEvent = new Event();
   this._tileWidth = defaultValue(options.tileWidth, 256);
   this._tileHeight = defaultValue(options.tileHeight, 256);
-  this._readyPromise = when.resolve(true);
+  this._readyPromise = Promise.resolve(true);
 }
 
 Object.defineProperties(TileCoordinatesImageryProvider.prototype, {

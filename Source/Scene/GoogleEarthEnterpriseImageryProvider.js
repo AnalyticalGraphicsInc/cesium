@@ -14,7 +14,6 @@ import Resource from "../Core/Resource.js";
 import RuntimeError from "../Core/RuntimeError.js";
 import TileProviderError from "../Core/TileProviderError.js";
 import protobuf from "../ThirdParty/protobuf-minimal.js";
-import when from "../ThirdParty/when.js";
 
 function GoogleEarthEnterpriseDiscardPolicy() {
   this._image = new Image();
@@ -144,14 +143,14 @@ function GoogleEarthEnterpriseImageryProvider(options) {
           undefined,
           e
         );
-        return when.reject(e);
+        return Promise.reject(e);
       }
 
       TileProviderError.handleSuccess(metadataError);
       that._ready = result;
       return result;
     })
-    .otherwise(function (e) {
+    .catch(function (e) {
       metadataError = TileProviderError.handleError(
         metadataError,
         that,
@@ -162,7 +161,7 @@ function GoogleEarthEnterpriseImageryProvider(options) {
         undefined,
         e
       );
-      return when.reject(e);
+      return Promise.reject(e);
     });
 }
 

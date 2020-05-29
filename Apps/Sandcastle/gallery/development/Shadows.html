@@ -777,7 +777,7 @@
             : ellipsoidTerrainProvider;
           globe.terrainProvider = terrainProvider;
           var promise = Cesium.sampleTerrain(terrainProvider, 11, positions);
-          Cesium.when(promise, function (updatedPositions) {
+          promise.then(function (updatedPositions) {
             location.height = updatedPositions[0].height + getModelPosition();
             createScene();
           });
@@ -892,7 +892,7 @@
                 })
               );
             })
-            .otherwise(function (error) {
+            .catch(function (error) {
               console.log(error);
             });
         }
@@ -918,7 +918,7 @@
                 loop: Cesium.ModelAnimationLoop.REPEAT,
               });
             })
-            .otherwise(function (error) {
+            .catch(function (error) {
               window.alert(error);
             });
 

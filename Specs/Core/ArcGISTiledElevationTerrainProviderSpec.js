@@ -365,7 +365,7 @@ describe("Core/ArcGISTiledElevationTerrainProvider", function () {
       url: baseUrl,
     });
 
-    return terrainProvider.readyPromise.then(fail).otherwise(function (error) {
+    return terrainProvider.readyPromise.then(fail).catch(function (error) {
       expect(error).toBeInstanceOf(RuntimeError);
     });
   });
@@ -379,7 +379,7 @@ describe("Core/ArcGISTiledElevationTerrainProvider", function () {
       url: baseUrl,
     });
 
-    return terrainProvider.readyPromise.then(fail).otherwise(function (error) {
+    return terrainProvider.readyPromise.then(fail).catch(function (error) {
       expect(error).toBeInstanceOf(RuntimeError);
     });
   });

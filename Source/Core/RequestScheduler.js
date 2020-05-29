@@ -1,5 +1,5 @@
+import defer from "./defer.js";
 import Uri from "../ThirdParty/Uri.js";
-import when from "../ThirdParty/when.js";
 import Check from "./Check.js";
 import defaultValue from "./defaultValue.js";
 import defined from "./defined.js";
@@ -165,7 +165,7 @@ function serverHasOpenSlots(serverKey) {
 function issueRequest(request) {
   if (request.state === RequestState.UNISSUED) {
     request.state = RequestState.ISSUED;
-    request.deferred = when.defer();
+    request.deferred = defer();
   }
   return request.deferred.promise;
 }
@@ -209,7 +209,7 @@ function startRequest(request) {
   request
     .requestFunction()
     .then(getRequestReceivedFunction(request))
-    .otherwise(getRequestFailedFunction(request));
+    .catch(getRequestFailedFunction(request));
   return promise;
 }
 

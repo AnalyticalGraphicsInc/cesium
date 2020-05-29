@@ -5,7 +5,6 @@ import DeveloperError from "../Core/DeveloperError.js";
 import Event from "../Core/Event.js";
 import CesiumMath from "../Core/Math.js";
 import Rectangle from "../Core/Rectangle.js";
-import when from "../ThirdParty/when.js";
 import ImageryLayer from "./ImageryLayer.js";
 
 /**
@@ -344,7 +343,7 @@ var applicableRectangleScratch = new Rectangle();
  * if (!Cesium.defined(featuresPromise)) {
  *     console.log('No features picked.');
  * } else {
- *     Cesium.when(featuresPromise, function(features) {
+ *     featuresPromise.then(function(features) {
  *         // This function is called asynchronously when the list if picked features is available.
  *         console.log('Number of features: ' + features.length);
  *         if (features.length > 0) {
@@ -454,7 +453,7 @@ ImageryLayerCollection.prototype.pickImageryLayerFeatures = function (
     return undefined;
   }
 
-  return when.all(promises, function (results) {
+  return Promise.all(promises).then(function (results) {
     var features = [];
 
     for (var resultIndex = 0; resultIndex < results.length; ++resultIndex) {

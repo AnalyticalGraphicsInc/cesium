@@ -35,7 +35,6 @@ import { ModelAnimationLoop } from "../../Source/Cesium.js";
 import { DepthFunction } from "../../Source/Cesium.js";
 import createScene from "../createScene.js";
 import pollToPromise from "../pollToPromise.js";
-import { when } from "../../Source/Cesium.js";
 
 describe(
   "Scene/Model",
@@ -189,7 +188,7 @@ describe(
       );
       modelPromises.push(FeatureDetection.supportsWebP.initialize());
 
-      return when.all(modelPromises);
+      return Promise.all(modelPromises);
     });
 
     afterAll(function () {
@@ -246,8 +245,8 @@ describe(
         .then(function () {
           return model;
         })
-        .otherwise(function () {
-          return when.reject(model);
+        .catch(function () {
+          return Promise.reject(model);
         });
     }
 
@@ -410,7 +409,7 @@ describe(
     });
 
     it("renders in 2D over the IDL", function () {
-      return when(loadModel(texturedBoxUrl)).then(function (model) {
+      return loadModel(texturedBoxUrl).then(function (model) {
         model.modelMatrix = Transforms.eastNorthUpToFixedFrame(
           Cartesian3.fromDegrees(180.0, 0.0, 100.0)
         );
@@ -602,7 +601,7 @@ describe(
           .then(function (model) {
             fail("should not resolve");
           })
-          .otherwise(function (error) {
+          .catch(function (error) {
             expect(model.ready).toEqual(false);
             primitives.remove(model);
           });
@@ -2437,7 +2436,7 @@ describe(
 
       expect(gltfCache[key].count).toEqual(2);
 
-      return when.all([promise, promise2], function (models) {
+      return Promise.all([promise, promise2], function (models) {
         var m = models[0];
         var m2 = models[1];
 
@@ -3106,7 +3105,7 @@ describe(
         .then(function () {
           fail("should not resolve");
         })
-        .otherwise(function (e) {
+        .catch(function (e) {
           expect(e).toBeDefined();
           primitives.remove(model);
           context._elementIndexUint = uint32Supported;
@@ -3236,7 +3235,7 @@ describe(
     it("error decoding a draco compressed glTF causes model loading to fail", function () {
       var decoder = DracoLoader._getDecoderTaskProcessor();
       spyOn(decoder, "scheduleTask").and.returnValue(
-        when.reject({ message: "my error" })
+        Promise.reject({ message: "my error" })
       );
 
       var model = primitives.add(
@@ -3257,7 +3256,7 @@ describe(
           .then(function (e) {
             fail("should not resolve");
           })
-          .otherwise(function (e) {
+          .catch(function (e) {
             expect(e).toBeDefined();
             expect(e.message).toEqual(
               "Failed to load model: ./Data/Models/DracoCompression/CesiumMilkTruck/CesiumMilkTruck.gltf\nmy error"
@@ -4080,7 +4079,7 @@ describe(
           heightReference: HeightReference.CLAMP_TO_GROUND,
           position: Cartesian3.fromDegrees(-72.0, 40.0),
           show: true,
-        }).otherwise(function (error) {
+        }).catch(function (error) {
           expect(error.message).toEqual(
             "Height reference is not supported without a scene and globe."
           );
@@ -4110,7 +4109,7 @@ describe(
           position: Cartesian3.fromDegrees(-72.0, 40.0),
           scene: scene,
           show: true,
-        }).otherwise(function (error) {
+        }).catch(function (error) {
           expect(error.message).toEqual(
             "Height reference is not supported without a scene and globe."
           );

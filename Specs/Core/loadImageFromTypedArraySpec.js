@@ -1,6 +1,5 @@
 import { loadImageFromTypedArray } from "../../Source/Cesium.js";
 import { Resource } from "../../Source/Cesium.js";
-import { when } from "../../Source/Cesium.js";
 
 describe("Core/loadImageFromTypedArray", function () {
   var supportsImageBitmapOptions;
@@ -37,7 +36,7 @@ describe("Core/loadImageFromTypedArray", function () {
       format: "image/png",
       flipY: true,
     };
-    spyOn(window, "createImageBitmap").and.returnValue(when.resolve({}));
+    spyOn(window, "createImageBitmap").and.returnValue(Promise.resolve({}));
     var blob = new Blob([options.uint8Array], {
       type: options.format,
     });
@@ -73,7 +72,7 @@ describe("Core/loadImageFromTypedArray", function () {
     }
 
     spyOn(Resource, "supportsImageBitmapOptions").and.returnValue(
-      when.resolve(false)
+      Promise.resolve(false)
     );
     spyOn(window, "createImageBitmap").and.callThrough();
     return Resource.fetchArrayBuffer("./Data/Images/Blue10x10.png").then(
@@ -101,7 +100,7 @@ describe("Core/loadImageFromTypedArray", function () {
       .then(function (image) {
         fail("should not be called");
       })
-      .otherwise(function () {});
+      .catch(function () {});
   });
 
   it("Throws without array", function () {

@@ -1,4 +1,3 @@
-import when from "../ThirdParty/when.js";
 import BoundingSphere from "./BoundingSphere.js";
 import Cartesian3 from "./Cartesian3.js";
 import defaultValue from "./defaultValue.js";
@@ -260,7 +259,7 @@ HeightmapTerrainData.prototype.createMesh = function (
   }
 
   var that = this;
-  return when(verticesPromise, function (result) {
+  return Promise.resolve(verticesPromise).then(function (result) {
     var indicesAndEdges;
     if (that._skirtHeight > 0.0) {
       indicesAndEdges = TerrainProvider.getRegularGridAndSkirtIndicesAndEdgeIndices(

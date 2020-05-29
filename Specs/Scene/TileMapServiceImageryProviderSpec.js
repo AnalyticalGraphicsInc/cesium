@@ -1,5 +1,6 @@
 import { Cartesian2 } from "../../Source/Cesium.js";
 import { Cartographic } from "../../Source/Cesium.js";
+import { defer } from "../../Source/Cesium.js";
 import { GeographicProjection } from "../../Source/Cesium.js";
 import { GeographicTilingScheme } from "../../Source/Cesium.js";
 import { getAbsoluteUri } from "../../Source/Cesium.js";
@@ -16,7 +17,6 @@ import { ImageryLayer } from "../../Source/Cesium.js";
 import { ImageryState } from "../../Source/Cesium.js";
 import { UrlTemplateImageryProvider } from "../../Source/Cesium.js";
 import pollToPromise from "../pollToPromise.js";
-import { when } from "../../Source/Cesium.js";
 
 describe("Scene/TileMapServiceImageryProvider", function () {
   var validSampleXmlString =
@@ -106,7 +106,7 @@ describe("Scene/TileMapServiceImageryProvider", function () {
   it("resolves readyPromise when promise url is used", function () {
     patchRequestScheduler(validSampleXmlString);
     var provider = new TileMapServiceImageryProvider({
-      url: when.resolve("made/up/tms/server/"),
+      url: Promise.resolve("made/up/tms/server/"),
     });
 
     return provider.readyPromise.then(function (result) {
@@ -134,13 +134,13 @@ describe("Scene/TileMapServiceImageryProvider", function () {
   it("rejects readyPromise if options.url rejects", function () {
     var error = new Error();
     var provider = new TileMapServiceImageryProvider({
-      url: when.reject(error),
+      url: Promise.reject(error),
     });
     return provider.readyPromise
       .then(function () {
         fail("should not resolve");
       })
-      .otherwise(function (result) {
+      .catch(function (result) {
         expect(result).toBe(error);
         expect(provider.ready).toBe(false);
       });
@@ -169,7 +169,7 @@ describe("Scene/TileMapServiceImageryProvider", function () {
       .then(function () {
         fail("should not resolve");
       })
-      .otherwise(function (e) {
+      .catch(function (e) {
         expect(provider.ready).toBe(false);
         expect(e.message).toContain("unsupported profile");
       });
@@ -197,7 +197,7 @@ describe("Scene/TileMapServiceImageryProvider", function () {
       .then(function () {
         fail("should not resolve");
       })
-      .otherwise(function (e) {
+      .catch(function (e) {
         expect(provider.ready).toBe(false);
         expect(e.message).toContain("expected tilesets or bbox attributes");
       });
@@ -382,7 +382,7 @@ describe("Scene/TileMapServiceImageryProvider", function () {
 
   it("resource request takes a query string", function () {
     /*eslint-disable no-unused-vars*/
-    var requestMetadata = when.defer();
+    var requestMetadata = defer();
     spyOn(Resource._Implementations, "loadWithXhr").and.callFake(function (
       url,
       responseType,

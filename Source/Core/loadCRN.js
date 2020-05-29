@@ -1,4 +1,3 @@
-import when from "../ThirdParty/when.js";
 import CompressedTextureBuffer from "./CompressedTextureBuffer.js";
 import defined from "./defined.js";
 import DeveloperError from "./DeveloperError.js";
@@ -32,7 +31,7 @@ var transcodeTaskProcessor = new TaskProcessor(
  *     var format = textureData.internalFormat;
  *     var arrayBufferView = textureData.bufferView;
  *     // use the data to create a texture
- * }).otherwise(function(error) {
+ * }).catch(function(error) {
  *     // an error occurred
  * });
  *
@@ -52,7 +51,7 @@ function loadCRN(resourceOrUrlOrBuffer) {
     resourceOrUrlOrBuffer instanceof ArrayBuffer ||
     ArrayBuffer.isView(resourceOrUrlOrBuffer)
   ) {
-    loadPromise = when.resolve(resourceOrUrlOrBuffer);
+    loadPromise = Promise.resolve(resourceOrUrlOrBuffer);
   } else {
     var resource = Resource.createIfNeeded(resourceOrUrlOrBuffer);
     loadPromise = resource.fetchArrayBuffer();

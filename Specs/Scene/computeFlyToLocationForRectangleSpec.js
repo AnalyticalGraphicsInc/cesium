@@ -4,7 +4,6 @@ import { computeFlyToLocationForRectangle } from "../../Source/Cesium.js";
 import { Globe } from "../../Source/Cesium.js";
 import { SceneMode } from "../../Source/Cesium.js";
 import createScene from "../createScene.js";
-import { when } from "../../Source/Cesium.js";
 
 describe("Scene/computeFlyToLocationForRectangle", function () {
   var scene;
@@ -52,7 +51,7 @@ describe("Scene/computeFlyToLocationForRectangle", function () {
     spyOn(
       computeFlyToLocationForRectangle,
       "_sampleTerrainMostDetailed"
-    ).and.returnValue(when.resolve(sampledResults));
+    ).and.returnValue(Promise.resolve(sampledResults));
 
     // Basically do the computation ourselves with our known values;
     var expectedResult;

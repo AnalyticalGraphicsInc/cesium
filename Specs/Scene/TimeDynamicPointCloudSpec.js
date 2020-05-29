@@ -21,7 +21,6 @@ import { TimeDynamicPointCloud } from "../../Source/Cesium.js";
 import createCanvas from "../createCanvas.js";
 import createScene from "../createScene.js";
 import pollToPromise from "../pollToPromise.js";
-import { when } from "../../Source/Cesium.js";
 
 describe(
   "Scene/TimeDynamicPointCloud",
@@ -812,7 +811,7 @@ describe(
       return loadFrame(pointCloud).then(function () {
         var decoder = DracoLoader._getDecoderTaskProcessor();
         spyOn(decoder, "scheduleTask").and.returnValue(
-          when.reject({ message: "my error" })
+          Promise.reject({ message: "my error" })
         );
         var spyUpdate = jasmine.createSpy("listener");
         pointCloud.frameFailed.addEventListener(spyUpdate);
@@ -823,7 +822,7 @@ describe(
         return pollToPromise(function () {
           var contents = pointCloud._frames[1].pointCloud;
           if (defined(contents) && !defined(failedPromise)) {
-            failedPromise = contents.readyPromise.otherwise(function () {
+            failedPromise = contents.readyPromise.catch(function () {
               frameFailed = true;
             });
           }

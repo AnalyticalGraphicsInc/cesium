@@ -1,7 +1,6 @@
 import { FeatureDetection } from "../../Source/Cesium.js";
 import { TaskProcessor } from "../../Source/Cesium.js";
 import absolutize from "../absolutize.js";
-import { when } from "../../Source/Cesium.js";
 
 describe("Core/TaskProcessor", function () {
   var taskProcessor;
@@ -51,21 +50,21 @@ describe("Core/TaskProcessor", function () {
     var parameters = new ArrayBuffer(byteLength);
     expect(parameters.byteLength).toEqual(byteLength);
 
-    return when(TaskProcessor._canTransferArrayBuffer, function (
-      canTransferArrayBuffer
-    ) {
-      var promise = taskProcessor.scheduleTask(parameters, [parameters]);
+    return Promise.resolve(TaskProcessor._canTransferArrayBuffer).then(
+      function (canTransferArrayBuffer) {
+        var promise = taskProcessor.scheduleTask(parameters, [parameters]);
 
-      if (canTransferArrayBuffer) {
-        // array buffer should be neutered when transferred
-        expect(parameters.byteLength).toEqual(0);
+        if (canTransferArrayBuffer) {
+          // array buffer should be neutered when transferred
+          expect(parameters.byteLength).toEqual(0);
+        }
+
+        // the worker should see the array with proper byte length
+        return promise.then(function (result) {
+          expect(result).toEqual(byteLength);
+        });
       }
-
-      // the worker should see the array with proper byte length
-      return promise.then(function (result) {
-        expect(result).toEqual(byteLength);
-      });
-    });
+    );
   });
 
   it("can transfer array buffer back from worker", function () {
@@ -95,7 +94,7 @@ describe("Core/TaskProcessor", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(error.message).toEqual(message);
       });
   });
@@ -113,7 +112,7 @@ describe("Core/TaskProcessor", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(error).toContain("postMessage failed");
       });
   });
@@ -139,7 +138,7 @@ describe("Core/TaskProcessor", function () {
       .then(function (result) {
         expect(eventRaised).toBe(true);
       })
-      .always(function () {
+      .finally(function () {
         removeListenerCallback();
       });
   });
@@ -165,10 +164,10 @@ describe("Core/TaskProcessor", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(eventRaised).toBe(true);
       })
-      .always(function () {
+      .finally(function () {
         removeListenerCallback();
       });
   });

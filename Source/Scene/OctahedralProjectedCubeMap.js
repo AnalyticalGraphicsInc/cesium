@@ -1,5 +1,6 @@
 import Cartesian3 from "../Core/Cartesian3.js";
 import ComponentDatatype from "../Core/ComponentDatatype.js";
+import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import destroyObject from "../Core/destroyObject.js";
 import IndexDatatype from "../Core/IndexDatatype.js";
@@ -16,7 +17,6 @@ import VertexArray from "../Renderer/VertexArray.js";
 import OctahedralProjectionAtlasFS from "../Shaders/OctahedralProjectionAtlasFS.js";
 import OctahedralProjectionFS from "../Shaders/OctahedralProjectionFS.js";
 import OctahedralProjectionVS from "../Shaders/OctahedralProjectionVS.js";
-import when from "../ThirdParty/when.js";
 
 /**
  * Packs all mip levels of a cube map into a 2D texture atlas.
@@ -42,7 +42,7 @@ function OctahedralProjectedCubeMap(url) {
 
   this._loading = false;
   this._ready = false;
-  this._readyPromise = when.defer();
+  this._readyPromise = defer();
 }
 
 Object.defineProperties(OctahedralProjectedCubeMap.prototype, {
@@ -295,7 +295,7 @@ OctahedralProjectedCubeMap.prototype.update = function (frameState) {
         that._cubeMapBuffers = buffers;
         that._loading = false;
       })
-      .otherwise(this._readyPromise.reject);
+      .catch(this._readyPromise.reject);
     this._loading = true;
   }
   if (!defined(this._cubeMapBuffers)) {

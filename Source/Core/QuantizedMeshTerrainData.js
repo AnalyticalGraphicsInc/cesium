@@ -1,4 +1,3 @@
-import when from "../ThirdParty/when.js";
 import BoundingSphere from "./BoundingSphere.js";
 import Cartesian2 from "./Cartesian2.js";
 import Cartesian3 from "./Cartesian3.js";
@@ -333,7 +332,7 @@ QuantizedMeshTerrainData.prototype.createMesh = function (
   }
 
   var that = this;
-  return when(verticesPromise, function (result) {
+  return Promise.resolve(verticesPromise).then(function (result) {
     var vertexCountWithoutSkirts = that._quantizedVertices.length / 3;
     var vertexCount =
       vertexCountWithoutSkirts +
@@ -514,7 +513,7 @@ QuantizedMeshTerrainData.prototype.upsample = function (
     : shortestSkirt * 0.5;
   var credits = this._credits;
 
-  return when(upsamplePromise).then(function (result) {
+  return Promise.resolve(upsamplePromise).then(function (result) {
     var quantizedVertices = new Uint16Array(result.vertices);
     var indicesTypedArray = IndexDatatype.createTypedArray(
       quantizedVertices.length / 3,

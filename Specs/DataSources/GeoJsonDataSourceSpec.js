@@ -10,7 +10,6 @@ import { ConstantProperty } from "../../Source/Cesium.js";
 import { EntityCollection } from "../../Source/Cesium.js";
 import { GeoJsonDataSource } from "../../Source/Cesium.js";
 import { HeightReference } from "../../Source/Cesium.js";
-import { when } from "../../Source/Cesium.js";
 
 describe("DataSources/GeoJsonDataSource", function () {
   var defaultMarkerSize;
@@ -698,7 +697,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       var entityCollection = dataSource.entities;
       var entity = entityCollection.values[0];
       expect(entity.billboard).toBeDefined();
-      return when(
+      return Promise.resolve(
         dataSource._pinBuilder.fromMakiIconId("bus", Color.WHITE, 64)
       ).then(function (image) {
         expect(entity.billboard.image.getValue()).toBe(image);
@@ -746,11 +745,11 @@ describe("DataSources/GeoJsonDataSource", function () {
       var entityCollection = dataSource.entities;
       var entity = entityCollection.values[0];
       expect(entity.billboard).toBeDefined();
-      return when(dataSource._pinBuilder.fromColor(Color.WHITE, 64)).then(
-        function (image) {
-          expect(entity.billboard.image.getValue()).toBe(image);
-        }
-      );
+      return Promise.resolve(
+        dataSource._pinBuilder.fromColor(Color.WHITE, 64)
+      ).then(function (image) {
+        expect(entity.billboard.image.getValue()).toBe(image);
+      });
     });
   });
 
@@ -1166,7 +1165,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       pointCrsLinkHref.crs.properties.href
     ] = function (properties) {
       expect(properties).toBe(pointCrsLinkHref.crs.properties);
-      return when(properties.href).then(function (href) {
+      return Promise.resolve(properties.href).then(function (href) {
         return function (coordinate) {
           expect(coordinate).toBe(pointCrsLinkHref.coordinates);
           return projectedPosition;
@@ -1380,7 +1379,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function () {});
+      .catch(function () {});
   });
 
   it("Fails with undefined geomeetry", function () {
@@ -1390,7 +1389,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function () {});
+      .catch(function () {});
   });
 
   it("Fails with unknown geomeetry in geometryCollection", function () {
@@ -1400,7 +1399,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function () {});
+      .catch(function () {});
   });
 
   it("load throws with undefined geoJson", function () {
@@ -1415,7 +1414,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(error).toBeInstanceOf(RuntimeError);
         expect(error.message).toContain(
           "Unsupported GeoJSON object type: TimeyWimey"
@@ -1428,7 +1427,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(error.statusCode).toBe(404);
       });
   });
@@ -1461,7 +1460,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(error).toBeInstanceOf(RuntimeError);
         expect(error.message).toContain("Unknown crs type: potato");
       });
@@ -1480,7 +1479,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(error).toBeInstanceOf(RuntimeError);
         expect(error.message).toContain("crs.properties is undefined.");
       });
@@ -1502,7 +1501,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(error).toBeInstanceOf(RuntimeError);
         expect(error.message).toContain("Unknown crs name: failMe");
       });
@@ -1525,7 +1524,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function (error) {
+      .catch(function (error) {
         expect(error).toBeInstanceOf(RuntimeError);
         expect(error.message).toContain(
           'Unable to resolve crs link: {"href":"failMe","type":"failMeTwice"}'
@@ -1544,7 +1543,7 @@ describe("DataSources/GeoJsonDataSource", function () {
       .then(function () {
         fail("should not be called");
       })
-      .otherwise(function () {
+      .catch(function () {
         expect(spy).toHaveBeenCalledWith(dataSource, jasmine.any(Error));
       });
   });

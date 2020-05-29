@@ -3,6 +3,7 @@ import Cartesian3 from "../Core/Cartesian3.js";
 import Cartographic from "../Core/Cartographic.js";
 import Credit from "../Core/Credit.js";
 import defaultValue from "../Core/defaultValue.js";
+import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import DeveloperError from "../Core/DeveloperError.js";
 import Event from "../Core/Event.js";
@@ -15,7 +16,6 @@ import RuntimeError from "../Core/RuntimeError.js";
 import TileProviderError from "../Core/TileProviderError.js";
 import WebMercatorProjection from "../Core/WebMercatorProjection.js";
 import WebMercatorTilingScheme from "../Core/WebMercatorTilingScheme.js";
-import when from "../ThirdParty/when.js";
 import DiscardMissingTileImagePolicy from "./DiscardMissingTileImagePolicy.js";
 import ImageryLayerFeatureInfo from "./ImageryLayerFeatureInfo.js";
 import ImageryProvider from "./ImageryProvider.js";
@@ -135,7 +135,7 @@ function ArcGisMapServerImageryProvider(options) {
   this._errorEvent = new Event();
 
   this._ready = false;
-  this._readyPromise = when.defer();
+  this._readyPromise = defer();
 
   // Grab the details of this MapServer.
   var that = this;
@@ -302,7 +302,7 @@ function ArcGisMapServerImageryProvider(options) {
       },
     });
     var metadata = resource.fetchJsonp();
-    when(metadata, metadataSuccess, metadataFailure);
+    Promise.resolve(metadata).then(metadataSuccess).catch(metadataFailure);
   }
 
   if (this._useTiles) {

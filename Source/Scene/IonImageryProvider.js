@@ -5,7 +5,6 @@ import DeveloperError from "../Core/DeveloperError.js";
 import Event from "../Core/Event.js";
 import IonResource from "../Core/IonResource.js";
 import RuntimeError from "../Core/RuntimeError.js";
-import when from "../ThirdParty/when.js";
 import ArcGisMapServerImageryProvider from "./ArcGisMapServerImageryProvider.js";
 import BingMapsImageryProvider from "./BingMapsImageryProvider.js";
 import TileMapServiceImageryProvider from "./TileMapServiceImageryProvider.js";
@@ -147,7 +146,7 @@ function IonImageryProvider(options) {
 
   this._readyPromise = promise.then(function (endpoint) {
     if (endpoint.type !== "IMAGERY") {
-      return when.reject(
+      return Promise.reject(
         new RuntimeError(
           "Cesium ion asset " + assetId + " is not an imagery asset."
         )
@@ -164,7 +163,7 @@ function IonImageryProvider(options) {
       var factory = ImageryProviderMapping[externalType];
 
       if (!defined(factory)) {
-        return when.reject(
+        return Promise.reject(
           new RuntimeError(
             "Unrecognized Cesium ion imagery type: " + externalType
           )

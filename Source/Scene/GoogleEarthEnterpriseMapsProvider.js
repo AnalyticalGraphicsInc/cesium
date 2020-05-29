@@ -2,6 +2,7 @@ import buildModuleUrl from "../Core/buildModuleUrl.js";
 import Check from "../Core/Check.js";
 import Credit from "../Core/Credit.js";
 import defaultValue from "../Core/defaultValue.js";
+import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import DeveloperError from "../Core/DeveloperError.js";
 import Event from "../Core/Event.js";
@@ -11,7 +12,6 @@ import Resource from "../Core/Resource.js";
 import RuntimeError from "../Core/RuntimeError.js";
 import TileProviderError from "../Core/TileProviderError.js";
 import WebMercatorTilingScheme from "../Core/WebMercatorTilingScheme.js";
-import when from "../ThirdParty/when.js";
 import ImageryProvider from "./ImageryProvider.js";
 
 /**
@@ -137,7 +137,7 @@ function GoogleEarthEnterpriseMapsProvider(options) {
   this._errorEvent = new Event();
 
   this._ready = false;
-  this._readyPromise = when.defer();
+  this._readyPromise = defer();
 
   var metadataResource = resource.getDerivedResource({
     url: "query",
@@ -259,7 +259,7 @@ function GoogleEarthEnterpriseMapsProvider(options) {
 
   function requestMetadata() {
     var metadata = metadataResource.fetchText();
-    when(metadata, metadataSuccess, metadataFailure);
+    Promise.resolve(metadata).then(metadataSuccess).catch(metadataFailure);
   }
 
   requestMetadata();

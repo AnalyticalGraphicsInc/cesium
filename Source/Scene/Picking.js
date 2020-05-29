@@ -6,6 +6,7 @@ import Cartographic from "../Core/Cartographic.js";
 import Check from "../Core/Check.js";
 import Color from "../Core/Color.js";
 import defaultValue from "../Core/defaultValue.js";
+import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import DeveloperError from "../Core/DeveloperError.js";
 import Matrix4 from "../Core/Matrix4.js";
@@ -15,7 +16,6 @@ import PerspectiveFrustum from "../Core/PerspectiveFrustum.js";
 import PerspectiveOffCenterFrustum from "../Core/PerspectiveOffCenterFrustum.js";
 import Ray from "../Core/Ray.js";
 import ShowGeometryInstanceAttribute from "../Core/ShowGeometryInstanceAttribute.js";
-import when from "../ThirdParty/when.js";
 import Camera from "./Camera.js";
 import Cesium3DTileFeature from "./Cesium3DTileFeature.js";
 import Cesium3DTilePass from "./Cesium3DTilePass.js";
@@ -602,7 +602,7 @@ function MostDetailedRayPick(ray, width, tilesets) {
   this.width = width;
   this.tilesets = tilesets;
   this.ready = false;
-  this.deferred = when.defer();
+  this.deferred = defer();
   this.promise = this.deferred.promise;
 }
 
@@ -698,7 +698,7 @@ function launchMostDetailedRayPick(
   var tilesets = [];
   getTilesets(scene.primitives, objectsToExclude, tilesets);
   if (tilesets.length === 0) {
-    return when.resolve(callback());
+    return Promise.resolve(callback());
   }
 
   var rayPick = new MostDetailedRayPick(ray, width, tilesets);
@@ -872,7 +872,7 @@ function drillPickFromRay(
 function deferPromiseUntilPostRender(scene, promise) {
   // Resolve promise after scene's postRender in case entities are created when the promise resolves.
   // Entities can't be created between viewer._onTick and viewer._postRender.
-  var deferred = when.defer();
+  var deferred = defer();
   promise
     .then(function (result) {
       var removeCallback = scene.postRender.addEventListener(function () {
@@ -881,7 +881,7 @@ function deferPromiseUntilPostRender(scene, promise) {
       });
       scene.requestRender();
     })
-    .otherwise(function (error) {
+    .catch(function (error) {
       deferred.reject(error);
     });
   return deferred.promise;
@@ -1237,7 +1237,7 @@ Picking.prototype.sampleHeightMostDetailed = function (
   }
   return deferPromiseUntilPostRender(
     scene,
-    when.all(promises).then(function (heights) {
+    Promise.all(promises).then(function (heights) {
       var length = heights.length;
       for (var i = 0; i < length; ++i) {
         positions[i].height = heights[i];
@@ -1284,7 +1284,7 @@ Picking.prototype.clampToHeightMostDetailed = function (
   }
   return deferPromiseUntilPostRender(
     scene,
-    when.all(promises).then(function (clampedCartesians) {
+    Promise.all(promises).then(function (clampedCartesians) {
       var length = clampedCartesians.length;
       for (var i = 0; i < length; ++i) {
         cartesians[i] = clampedCartesians[i];
