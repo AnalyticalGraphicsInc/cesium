@@ -20,6 +20,10 @@ import SceneMode from "./SceneMode.js";
 var CameraFlightPath = {};
 
 function getAltitude(frustum, dx, dy) {
+  // Calculate the necessary altitude for the camera from the start position,
+  // so that the destination will appear on the screen. The function assumes
+  // top-down view and the camera's height is positive. It is an approximation
+  // and minor inaccuracies are neglected
   var near;
   var top;
   var right;
@@ -77,14 +81,20 @@ function createHeightFunction(
   destination,
   startHeight,
   endHeight,
-  optionAltitude
+  optionAltitude,
+  optionMaxStraightFlightDistance
 ) {
+  var maxStraightFlightDistance = defaultValue(
+    optionMaxStraightFlightDistance,
+    3000.0
+  );
   var altitude = optionAltitude;
   var maxHeight = Math.max(startHeight, endHeight);
+  var start = camera.position;
+  var end = destination;
+  var distance = Cartesian3.distance(start, end);
 
   if (!defined(altitude)) {
-    var start = camera.position;
-    var end = destination;
     var up = camera.up;
     var right = camera.right;
     var frustum = camera.frustum;
@@ -107,7 +117,7 @@ function createHeightFunction(
     );
   }
 
-  if (maxHeight < altitude) {
+  if (distance > maxStraightFlightDistance && maxHeight < altitude) {
     var power = 8.0;
     var factor = 1000000.0;
 
@@ -154,7 +164,8 @@ function createUpdateCV(
   heading,
   pitch,
   roll,
-  optionAltitude
+  optionAltitude,
+  optionMaxStraightFlightDistance
 ) {
   var camera = scene.camera;
 
@@ -168,7 +179,8 @@ function createUpdateCV(
     destination,
     start.z,
     destination.z,
-    optionAltitude
+    optionAltitude,
+    optionMaxStraightFlightDistance
   );
 
   function update(value) {
@@ -216,6 +228,7 @@ function createUpdate3D(
   pitch,
   roll,
   optionAltitude,
+  optionMaxStraightFlightDistance,
   optionFlyOverLongitude,
   optionFlyOverLongitudeWeight,
   optionPitchAdjustHeight
@@ -277,7 +290,8 @@ function createUpdate3D(
     destination,
     startCart.height,
     destCart.height,
-    optionAltitude
+    optionAltitude,
+    optionMaxStraightFlightDistance
   );
   var pitchFunction = createPitchFunction(
     startPitch,
@@ -326,7 +340,8 @@ function createUpdate2D(
   heading,
   pitch,
   roll,
-  optionAltitude
+  optionAltitude,
+  optionMaxStraightFlightDistance
 ) {
   var camera = scene.camera;
 
@@ -339,7 +354,8 @@ function createUpdate2D(
     destination,
     startHeight,
     destination.z,
-    optionAltitude
+    optionAltitude,
+    optionMaxStraightFlightDistance
   );
 
   function update(value) {
@@ -413,6 +429,7 @@ CameraFlightPath.createTween = function (scene, options) {
   var projection = scene.mapProjection;
   var ellipsoid = projection.ellipsoid;
   var maximumHeight = options.maximumHeight;
+  var maximumStraightFlightDistance = options.maximumStraightFlightDistance;
   var flyOverLongitude = options.flyOverLongitude;
   var flyOverLongitudeWeight = options.flyOverLongitudeWeight;
   var pitchAdjustHeight = options.pitchAdjustHeight;
@@ -507,6 +524,7 @@ CameraFlightPath.createTween = function (scene, options) {
         pitch,
         roll,
         maximumHeight,
+        maximumStraightFlightDistance,
         flyOverLongitude,
         flyOverLongitudeWeight,
         pitchAdjustHeight
@@ -528,6 +546,7 @@ CameraFlightPath.createTween = function (scene, options) {
     pitch,
     roll,
     maximumHeight,
+    maximumStraightFlightDistance,
     flyOverLongitude,
     flyOverLongitudeWeight,
     pitchAdjustHeight
