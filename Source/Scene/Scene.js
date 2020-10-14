@@ -1900,7 +1900,7 @@ Scene.prototype.updateFrameState = function () {
   );
   frameState.occluder = getOccluder(this);
   frameState.terrainExaggeration = this._terrainExaggeration;
-  frameState.minimumTerrainHeight = 0.0;
+  frameState.minimumTerrainHeight = -1000.0;
   frameState.minimumDisableDepthTestDistance = this._minimumDisableDepthTestDistance;
   frameState.invertClassification = this.invertClassification;
   frameState.useLogDepth =

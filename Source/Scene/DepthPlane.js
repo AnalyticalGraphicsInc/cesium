@@ -111,17 +111,17 @@ function computeDepthQuad(ellipsoid, frameState) {
   return depthQuadScratch;
 }
 
-const DEPTH_OFFSET_MAGIC_NUMBER = -400;
-
 DepthPlane.prototype.update = function (frameState) {
   this._mode = frameState.mode;
   if (frameState.mode !== SceneMode.SCENE3D) {
     return;
   }
 
+  var minimumTerrainHeight = frameState.minimumTerrainHeight
+
   var context = frameState.context;
   var r = frameState.mapProjection.ellipsoid.radii;
-  var ellipsoid = new Ellipsoid(r.x + DEPTH_OFFSET_MAGIC_NUMBER, r.y + DEPTH_OFFSET_MAGIC_NUMBER, r.z + DEPTH_OFFSET_MAGIC_NUMBER);
+  var ellipsoid = new Ellipsoid(r.x + minimumTerrainHeight, r.y + minimumTerrainHeight, r.z + minimumTerrainHeight);
   var useLogDepth = frameState.useLogDepth;
 
   if (!defined(this._command)) {
