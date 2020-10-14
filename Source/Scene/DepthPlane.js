@@ -17,6 +17,7 @@ import VertexArray from "../Renderer/VertexArray.js";
 import DepthPlaneFS from "../Shaders/DepthPlaneFS.js";
 import DepthPlaneVS from "../Shaders/DepthPlaneVS.js";
 import SceneMode from "./SceneMode.js";
+import Ellipsoid from "../Core/Ellipsoid.js"
 
 /**
  * @private
@@ -110,6 +111,8 @@ function computeDepthQuad(ellipsoid, frameState) {
   return depthQuadScratch;
 }
 
+const DEPTH_OFFSET_MAGIC_NUMBER = -400;
+
 DepthPlane.prototype.update = function (frameState) {
   this._mode = frameState.mode;
   if (frameState.mode !== SceneMode.SCENE3D) {
@@ -117,7 +120,8 @@ DepthPlane.prototype.update = function (frameState) {
   }
 
   var context = frameState.context;
-  var ellipsoid = frameState.mapProjection.ellipsoid;
+  var r = frameState.mapProjection.ellipsoid.radii;
+  var ellipsoid = new Ellipsoid(r.x + DEPTH_OFFSET_MAGIC_NUMBER, r.y + DEPTH_OFFSET_MAGIC_NUMBER, r.z + DEPTH_OFFSET_MAGIC_NUMBER);
   var useLogDepth = frameState.useLogDepth;
 
   if (!defined(this._command)) {
