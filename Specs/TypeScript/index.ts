@@ -37,6 +37,7 @@ import {
   FrustumOutlineGeometry,
   GeoJsonDataSource,
   GeometryInstance,
+  GpxDataSource,
   GoogleEarthEnterpriseImageryProvider,
   GoogleEarthEnterpriseMapsProvider,
   GoogleEarthEnterpriseMetadata,
@@ -156,6 +157,7 @@ dataSource = new KmlDataSource({
   canvas: document.createElement("canvas"),
   camera: new Camera(new Scene()),
 });
+dataSource = new GpxDataSource();
 dataSource = new CustomDataSource();
 
 // Verify Property instances conform to the expected interface
