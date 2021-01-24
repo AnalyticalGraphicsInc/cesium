@@ -2,6 +2,10 @@
 
 ### 1.79 - 2021-03-01
 
+##### Additions :tada:
+
+- Added `ModelAnimationCollection.manualAnimation` and `ModelAnimation.animationTime` to allow explicit control over a model's animations.
+
 ##### Fixes :wrench:
 
 - Fixed an issue where certain inputs to EllipsoidGeodesic would result in a surfaceDistance of NaN. [#9316](https://github.com/CesiumGS/cesium/pull/9316)
