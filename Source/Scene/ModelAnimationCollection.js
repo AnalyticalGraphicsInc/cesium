@@ -405,11 +405,9 @@ ModelAnimationCollection.prototype.update = function (frameState) {
         continue;
       }
       scheduledAnimation._prevAnimationTime = scheduledAnimation.animationTime;
-      if (duration !== 0.0) {
-        delta = scheduledAnimation.animationTime / duration;
-      } else {
-        delta = 0.0;
-      }
+      delta =
+        duration !== 0.0 ? scheduledAnimation.animationTime / duration : 0.0;
+
       play = true;
     } else {
       if (!defined(scheduledAnimation._computedStartTime)) {

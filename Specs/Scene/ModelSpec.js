@@ -1886,8 +1886,9 @@ describe(
       scene.renderForSpecs(time);
       a.animationTime = 0.5;
       scene.renderForSpecs(JulianDate.addSeconds(time, 1.0, new JulianDate()));
-      a.animationTime = 1.7;
       scene.renderForSpecs(JulianDate.addSeconds(time, 2.0, new JulianDate()));
+      a.animationTime = 1.7;
+      scene.renderForSpecs(JulianDate.addSeconds(time, 3.0, new JulianDate()));
 
       expect(spyUpdate.calls.count()).toEqual(3);
       expect(spyUpdate.calls.argsFor(0)[2]).toEqualEpsilon(
