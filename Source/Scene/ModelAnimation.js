@@ -44,7 +44,7 @@ function ModelAnimation(options, model, runtimeAnimation) {
    * rather than deriving the local animation time from the current time
    * and the above parameters.
    */
-  this.animationTime = undefined;
+  this.animationTime = options.animationTime;
   this._prevAnimationTime = undefined;
 
   /**
