@@ -46,6 +46,12 @@ function ModelAnimationCollection(model) {
    */
   this.animationRemoved = new Event();
 
+  /**
+   * When false, all the animations are time based. When true, each animation can choose to
+   * override the local animation time.
+   */
+  this.manualAnimation = false;
+
   this._model = model;
   this._scheduledAnimations = [];
   this._previousTime = undefined;
@@ -366,8 +372,11 @@ ModelAnimationCollection.prototype.update = function (frameState) {
     return false;
   }
 
-  if (JulianDate.equals(frameState.time, this._previousTime)) {
-    // Animations are currently only time-dependent so do not animate when paused or picking
+  if (
+    !this.manualAnimation &&
+    JulianDate.equals(frameState.time, this._previousTime)
+  ) {
+    // Animations are all time-dependent so do not animate when paused or picking
     return false;
   }
   this._previousTime = JulianDate.clone(frameState.time, this._previousTime);
@@ -380,54 +389,70 @@ ModelAnimationCollection.prototype.update = function (frameState) {
     var scheduledAnimation = scheduledAnimations[i];
     var runtimeAnimation = scheduledAnimation._runtimeAnimation;
 
-    if (!defined(scheduledAnimation._computedStartTime)) {
-      scheduledAnimation._computedStartTime = JulianDate.addSeconds(
-        defaultValue(scheduledAnimation.startTime, sceneTime),
-        scheduledAnimation.delay,
-        new JulianDate()
-      );
-    }
-
     if (!defined(scheduledAnimation._duration)) {
       scheduledAnimation._duration =
         runtimeAnimation.stopTime * (1.0 / scheduledAnimation.multiplier);
     }
 
-    var startTime = scheduledAnimation._computedStartTime;
     var duration = scheduledAnimation._duration;
-    var stopTime = scheduledAnimation.stopTime;
+    var delta;
+    var play;
+    if (this.manualAnimation && defined(scheduledAnimation.animationTime)) {
+      if (
+        scheduledAnimation.animationTime ===
+        scheduledAnimation._prevAnimationTime
+      ) {
+        continue;
+      }
+      scheduledAnimation._prevAnimationTime = scheduledAnimation.animationTime;
+      delta =
+        duration !== 0.0 ? scheduledAnimation.animationTime / duration : 0.0;
 
-    // [0.0, 1.0] normalized local animation time
-    var delta =
-      duration !== 0.0
-        ? JulianDate.secondsDifference(sceneTime, startTime) / duration
-        : 0.0;
+      play = true;
+    } else {
+      if (!defined(scheduledAnimation._computedStartTime)) {
+        scheduledAnimation._computedStartTime = JulianDate.addSeconds(
+          defaultValue(scheduledAnimation.startTime, sceneTime),
+          scheduledAnimation.delay,
+          new JulianDate()
+        );
+      }
 
-    // Clamp delta to stop time, if defined.
-    if (
-      duration !== 0.0 &&
-      defined(stopTime) &&
-      JulianDate.greaterThan(sceneTime, stopTime)
-    ) {
-      delta = JulianDate.secondsDifference(stopTime, startTime) / duration;
+      var startTime = scheduledAnimation._computedStartTime;
+      var stopTime = scheduledAnimation.stopTime;
+
+      // [0.0, 1.0] normalized local animation time
+      delta =
+        duration !== 0.0
+          ? JulianDate.secondsDifference(sceneTime, startTime) / duration
+          : 0.0;
+
+      // Clamp delta to stop time, if defined.
+      if (
+        duration !== 0.0 &&
+        defined(stopTime) &&
+        JulianDate.greaterThan(sceneTime, stopTime)
+      ) {
+        delta = JulianDate.secondsDifference(stopTime, startTime) / duration;
+      }
+
+      var pastStartTime = delta >= 0.0;
+
+      // Play animation if
+      // * we are after the start time or the animation is being repeated, and
+      // * before the end of the animation's duration or the animation is being repeated, and
+      // * we did not reach a user-provided stop time.
+
+      var repeat =
+        scheduledAnimation.loop === ModelAnimationLoop.REPEAT ||
+        scheduledAnimation.loop === ModelAnimationLoop.MIRRORED_REPEAT;
+
+      play =
+        (pastStartTime || (repeat && !defined(scheduledAnimation.startTime))) &&
+        (delta <= 1.0 || repeat) &&
+        (!defined(stopTime) ||
+          JulianDate.lessThanOrEquals(sceneTime, stopTime));
     }
-
-    var pastStartTime = delta >= 0.0;
-
-    // Play animation if
-    // * we are after the start time or the animation is being repeated, and
-    // * before the end of the animation's duration or the animation is being repeated, and
-    // * we did not reach a user-provided stop time.
-
-    var repeat =
-      scheduledAnimation.loop === ModelAnimationLoop.REPEAT ||
-      scheduledAnimation.loop === ModelAnimationLoop.MIRRORED_REPEAT;
-
-    var play =
-      (pastStartTime || (repeat && !defined(scheduledAnimation.startTime))) &&
-      (delta <= 1.0 || repeat) &&
-      (!defined(stopTime) || JulianDate.lessThanOrEquals(sceneTime, stopTime));
-
     // If it IS, or WAS, animating...
     if (play || scheduledAnimation._state === ModelAnimationState.ANIMATING) {
       // STOPPED -> ANIMATING state transition?

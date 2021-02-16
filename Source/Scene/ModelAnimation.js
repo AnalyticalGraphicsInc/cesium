@@ -40,6 +40,14 @@ function ModelAnimation(options, model, runtimeAnimation) {
   this._loop = defaultValue(options.loop, ModelAnimationLoop.NONE);
 
   /**
+   * If this is defined, it will be used as the local animation time,
+   * rather than deriving the local animation time from the current time
+   * and the above parameters.
+   */
+  this.animationTime = options.animationTime;
+  this._prevAnimationTime = undefined;
+
+  /**
    * The event fired when this animation is started.  This can be used, for
    * example, to play a sound or start a particle system, when the animation starts.
    * <p>

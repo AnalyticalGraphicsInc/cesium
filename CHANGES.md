@@ -2,6 +2,10 @@
 
 ### 1.79 - 2021-03-01
 
+##### Additions :tada:
+
+- Added `ModelAnimationCollection.manualAnimation` and `ModelAnimation.animationTime` to allow explicit control over a model's animations.
+
 ##### Fixes :wrench:
 
 - Fixed an issue that prevented use of the full CesiumJS zip release package in a Node.js application.
