@@ -352,6 +352,7 @@ function Cesium3DTile(tileset, baseResource, header, parent) {
   this._shouldSelect = false;
   this._isClipped = true;
   this._clippingPlanesState = 0; // encapsulates (_isClipped, clippingPlanes.enabled) and number/function
+  this._clippingPolygonState = 0; // encapsulates (-isClipped, clippingPolygons.enabled)
   this._debugBoundingVolume = undefined;
   this._debugContentBoundingVolume = undefined;
   this._debugViewerRequestVolume = undefined;
@@ -1078,6 +1079,7 @@ Cesium3DTile.prototype.unloadContent = function () {
 
   this.lastStyleTime = 0.0;
   this.clippingPlanesDirty = this._clippingPlanesState === 0;
+  // TODO: Handle clipping polygon
   this._clippingPlanesState = 0;
 
   this._debugColorizeTiles = false;
@@ -1154,6 +1156,7 @@ Cesium3DTile.prototype.visibility = function (
 
   var tileset = this._tileset;
   var clippingPlanes = tileset.clippingPlanes;
+  // TODO: Handle clipping polygon
   if (defined(clippingPlanes) && clippingPlanes.enabled) {
     var intersection = clippingPlanes.computeIntersectionWithBoundingVolume(
       boundingVolume,
@@ -1200,6 +1203,9 @@ Cesium3DTile.prototype.contentVisibility = function (frameState) {
 
   var tileset = this._tileset;
   var clippingPlanes = tileset.clippingPlanes;
+
+  // TODO: handle clipping polygon
+
   if (defined(clippingPlanes) && clippingPlanes.enabled) {
     var intersection = clippingPlanes.computeIntersectionWithBoundingVolume(
       boundingVolume,
@@ -1604,6 +1610,8 @@ function updateClippingPlanes(tile, tileset) {
     tile._clippingPlanesState = currentClippingPlanesState;
     tile.clippingPlanesDirty = true;
   }
+
+  // HANDLE CLIPPING POLYGON
 }
 
 /**
@@ -1629,6 +1637,8 @@ Cesium3DTile.prototype.update = function (tileset, frameState, passOptions) {
   }
 
   this.clippingPlanesDirty = false; // reset after content update
+
+  // handle clipping polygon
 };
 
 var scratchCommandList = [];
