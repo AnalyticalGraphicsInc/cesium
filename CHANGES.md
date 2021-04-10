@@ -22,6 +22,10 @@
 
 ### 1.79 - 2021-03-01
 
+##### Additions :tada:
+
+- Added `imageUrl` and `imageScale` to `GeoJsonDataSource` which allows points to specify an image. [#9382](https://github.com/CesiumGS/cesium/pull/9382)
+
 ##### Breaking Changes :mega:
 
 - Removed `Cesium3DTileset.url`, which was deprecated in CesiumJS 1.78. Use `Cesium3DTileset.resource.url` to retrieve the url value.
