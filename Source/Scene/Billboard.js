@@ -183,6 +183,7 @@ function Billboard(options, billboardCollection) {
       } else if (defined(image.src)) {
         imageId = image.src;
       } else {
+        this._shouldFreeImage = true;
         imageId = createGuid();
       }
     }
@@ -913,6 +914,7 @@ Object.defineProperties(Billboard.prototype, {
     },
     set: function (value) {
       if (!defined(value)) {
+        this._freeFromTextureAtlas();
         this._imageIndex = -1;
         this._imageSubRegion = undefined;
         this._imageId = undefined;
@@ -926,6 +928,7 @@ Object.defineProperties(Billboard.prototype, {
       } else if (defined(value.src)) {
         this.setImage(value.src, value);
       } else {
+        this._shouldFreeImage = true;
         this.setImage(createGuid(), value);
       }
     },
@@ -1133,6 +1136,7 @@ Billboard.prototype._loadImage = function () {
   var imageId = this._imageId;
   var image = this._image;
   var imageSubRegion = this._imageSubRegion;
+  var shouldFreeImage = this._shouldFreeImage;
   var imageIndexPromise;
 
   if (defined(image)) {
@@ -1157,6 +1161,9 @@ Billboard.prototype._loadImage = function () {
         !BoundingRectangle.equals(that._imageSubRegion, imageSubRegion)
       ) {
         // another load occurred before this one finished, ignore the index
+        if (shouldFreeImage) {
+          atlas.freeImageNode(imageId, index);
+        }
         return;
       }
 
@@ -1225,6 +1232,7 @@ Billboard.prototype.setImage = function (id, image) {
     return;
   }
 
+  this._freeFromTextureAtlas();
   this._imageIndex = -1;
   this._imageSubRegion = undefined;
   this._imageId = id;
@@ -1261,6 +1269,7 @@ Billboard.prototype.setImageSubRegion = function (id, subRegion) {
     return;
   }
 
+  this._freeFromTextureAtlas();
   this._imageIndex = -1;
   this._imageId = id;
   this._imageSubRegion = BoundingRectangle.clone(subRegion);
@@ -1508,7 +1517,20 @@ Billboard.prototype.equals = function (other) {
   );
 };
 
+// will free the textureAtlas node if no other resources are using this image id anymore
+Billboard.prototype._freeFromTextureAtlas = function () {
+  if (defined(this._imageId) && this._shouldFreeImage) {
+    this._shouldFreeImage = false;
+    var atlas = this._billboardCollection._textureAtlas;
+    if (atlas) {
+      atlas.freeImageNode(this._imageId, this._imageIndex);
+    }
+  }
+};
+
 Billboard.prototype._destroy = function () {
+  this._freeFromTextureAtlas();
+
   if (defined(this._customData)) {
     this._billboardCollection._scene.globe._surface.removeTileCustomData(
       this._customData
