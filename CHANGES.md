@@ -97,6 +97,7 @@
 ##### Additions :tada:
 
 - Added `Matrix3.inverseTranspose` and `Matrix4.inverseTranspose`. [#9135](https://github.com/CesiumGS/cesium/pull/9135)
+- Added `Camera.maximumTilt` to prevent camera from being tilted past that angle.
 
 ##### Fixes :wrench:
 
