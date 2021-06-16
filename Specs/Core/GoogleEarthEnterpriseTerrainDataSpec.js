@@ -1,6 +1,7 @@
 import { Cartesian3 } from "../../Source/Cesium.js";
 import { Cartographic } from "../../Source/Cesium.js";
 import { Ellipsoid } from "../../Source/Cesium.js";
+import { GeographicProjection } from "../../Source/Cesium.js";
 import { GeographicTilingScheme } from "../../Source/Cesium.js";
 import { GoogleEarthEnterpriseTerrainData } from "../../Source/Cesium.js";
 import { Math as CesiumMath } from "../../Source/Cesium.js";
@@ -146,12 +147,16 @@ describe("Core/GoogleEarthEnterpriseTerrainData", function () {
         tilingScheme.tileXYToRectangle(1, 1, 1),
       ];
 
+      var geographicProjection = new GeographicProjection();
+      var serializedMapProjection = geographicProjection.serialize();
+
       return when(
         data.createMesh({
           tilingScheme: tilingScheme,
           x: 0,
           y: 0,
           level: 0,
+          serializedMapProjection: serializedMapProjection,
         })
       )
         .then(function () {
@@ -240,6 +245,8 @@ describe("Core/GoogleEarthEnterpriseTerrainData", function () {
     var data;
     var tilingScheme;
     var buffer;
+    var geographicProjection = new GeographicProjection();
+    var serializedMapProjection = geographicProjection.serialize();
 
     beforeEach(function () {
       tilingScheme = new GeographicTilingScheme();
@@ -259,6 +266,7 @@ describe("Core/GoogleEarthEnterpriseTerrainData", function () {
           x: 0,
           y: 0,
           level: 0,
+          serializedMapProjection: serializedMapProjection,
         });
       }).toThrowDeveloperError();
     });
@@ -270,6 +278,7 @@ describe("Core/GoogleEarthEnterpriseTerrainData", function () {
           x: undefined,
           y: 0,
           level: 0,
+          serializedMapProjection: serializedMapProjection,
         });
       }).toThrowDeveloperError();
     });
@@ -281,6 +290,7 @@ describe("Core/GoogleEarthEnterpriseTerrainData", function () {
           x: 0,
           y: undefined,
           level: 0,
+          serializedMapProjection: serializedMapProjection,
         });
       }).toThrowDeveloperError();
     });
@@ -292,6 +302,19 @@ describe("Core/GoogleEarthEnterpriseTerrainData", function () {
           x: 0,
           y: 0,
           level: undefined,
+          serializedMapProjection: serializedMapProjection,
+        });
+      }).toThrowDeveloperError();
+    });
+
+    it("requires serializedMapProjection", function () {
+      expect(function () {
+        data.createMesh({
+          tilingScheme: tilingScheme,
+          x: 0,
+          y: 0,
+          level: 0,
+          serializedMapProjection: undefined,
         });
       }).toThrowDeveloperError();
     });
@@ -306,6 +329,7 @@ describe("Core/GoogleEarthEnterpriseTerrainData", function () {
           x: 0,
           y: 0,
           level: 0,
+          serializedMapProjection: serializedMapProjection,
         })
         .then(function (mesh) {
           expect(mesh).toBeInstanceOf(TerrainMesh);
@@ -347,6 +371,7 @@ describe("Core/GoogleEarthEnterpriseTerrainData", function () {
           y: 0,
           level: 0,
           exaggeration: 2,
+          serializedMapProjection: serializedMapProjection,
         })
         .then(function (mesh) {
           expect(mesh).toBeInstanceOf(TerrainMesh);

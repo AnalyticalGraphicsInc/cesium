@@ -1,3 +1,4 @@
+import deserializeMapProjection from "../Core/deserializeMapProjection.js";
 import Ellipsoid from "../Core/Ellipsoid.js";
 import HeightmapEncoding from "../Core/HeightmapEncoding.js";
 import HeightmapTessellator from "../Core/HeightmapTessellator.js";
@@ -29,25 +30,32 @@ function createVerticesFromHeightmap(parameters, transferableObjects) {
   parameters.ellipsoid = Ellipsoid.clone(parameters.ellipsoid);
   parameters.rectangle = Rectangle.clone(parameters.rectangle);
 
-  var statistics = HeightmapTessellator.computeVertices(parameters);
-  var vertices = statistics.vertices;
-  transferableObjects.push(vertices.buffer);
+  return deserializeMapProjection(parameters.serializedMapProjection).then(
+    function (mapProjection) {
+      var statistics = HeightmapTessellator.computeVertices(
+        parameters,
+        mapProjection
+      );
+      var vertices = statistics.vertices;
+      transferableObjects.push(vertices.buffer);
 
-  return {
-    vertices: vertices.buffer,
-    numberOfAttributes: statistics.encoding.getStride(),
-    minimumHeight: statistics.minimumHeight,
-    maximumHeight: statistics.maximumHeight,
-    gridWidth: parameters.width,
-    gridHeight: parameters.height,
-    boundingSphere3D: statistics.boundingSphere3D,
-    orientedBoundingBox: statistics.orientedBoundingBox,
-    occludeePointInScaledSpace: statistics.occludeePointInScaledSpace,
-    encoding: statistics.encoding,
-    westIndicesSouthToNorth: statistics.westIndicesSouthToNorth,
-    southIndicesEastToWest: statistics.southIndicesEastToWest,
-    eastIndicesNorthToSouth: statistics.eastIndicesNorthToSouth,
-    northIndicesWestToEast: statistics.northIndicesWestToEast,
-  };
+      return {
+        vertices: vertices.buffer,
+        numberOfAttributes: statistics.encoding.getStride(),
+        minimumHeight: statistics.minimumHeight,
+        maximumHeight: statistics.maximumHeight,
+        gridWidth: parameters.width,
+        gridHeight: parameters.height,
+        boundingSphere3D: statistics.boundingSphere3D,
+        orientedBoundingBox: statistics.orientedBoundingBox,
+        occludeePointInScaledSpace: statistics.occludeePointInScaledSpace,
+        encoding: statistics.encoding,
+        westIndicesSouthToNorth: statistics.westIndicesSouthToNorth,
+        southIndicesEastToWest: statistics.southIndicesEastToWest,
+        eastIndicesNorthToSouth: statistics.eastIndicesNorthToSouth,
+        northIndicesWestToEast: statistics.northIndicesWestToEast,
+      };
+    }
+  );
 }
 export default createTaskProcessorWorker(createVerticesFromHeightmap);

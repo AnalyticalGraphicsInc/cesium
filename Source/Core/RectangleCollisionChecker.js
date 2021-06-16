@@ -1,12 +1,15 @@
 import RBush from "../ThirdParty/rbush.js";
+import Rectangle from "./Rectangle.js";
 import Check from "./Check.js";
 
 /**
  * Wrapper around rbush for use with Rectangle types.
+ * Checks for collisions using the approximates projected extents of Rectangles.
  * @private
  */
-function RectangleCollisionChecker() {
+function RectangleCollisionChecker(mapProjection) {
   this._tree = new RBush();
+  this._mapProjection = mapProjection;
 }
 
 function RectangleWithId() {
@@ -17,11 +20,25 @@ function RectangleWithId() {
   this.id = "";
 }
 
-RectangleWithId.fromRectangleAndId = function (id, rectangle, result) {
-  result.minX = rectangle.west;
-  result.minY = rectangle.south;
-  result.maxX = rectangle.east;
-  result.maxY = rectangle.north;
+var projectedExtentsScratch = new Rectangle();
+RectangleWithId.fromRectangleAndId = function (
+  id,
+  rectangle,
+  result,
+  mapProjection
+) {
+  var projectedExtents = Rectangle.approximateProjectedExtents(
+    {
+      cartographicRectangle: rectangle,
+      mapProjection: mapProjection,
+    },
+    projectedExtentsScratch
+  );
+
+  result.minX = projectedExtents.west;
+  result.minY = projectedExtents.south;
+  result.maxX = projectedExtents.east;
+  result.maxY = projectedExtents.north;
   result.id = id;
   return result;
 };
@@ -42,7 +59,8 @@ RectangleCollisionChecker.prototype.insert = function (id, rectangle) {
   var withId = RectangleWithId.fromRectangleAndId(
     id,
     rectangle,
-    new RectangleWithId()
+    new RectangleWithId(),
+    this._mapProjection
   );
   this._tree.insert(withId);
 };
@@ -68,7 +86,8 @@ RectangleCollisionChecker.prototype.remove = function (id, rectangle) {
   var withId = RectangleWithId.fromRectangleAndId(
     id,
     rectangle,
-    removalScratch
+    removalScratch,
+    this._mapProjection
   );
   this._tree.remove(withId, idCompare);
 };
@@ -88,7 +107,8 @@ RectangleCollisionChecker.prototype.collides = function (rectangle) {
   var withId = RectangleWithId.fromRectangleAndId(
     "",
     rectangle,
-    collisionScratch
+    collisionScratch,
+    this._mapProjection
   );
   return this._tree.collides(withId);
 };

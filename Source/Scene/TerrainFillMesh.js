@@ -744,6 +744,7 @@ function propagateEdge(
 var cartographicScratch = new Cartographic();
 var centerCartographicScratch = new Cartographic();
 var cartesianScratch = new Cartesian3();
+var projectedCartesianScratch = new Cartesian3();
 var normalScratch = new Cartesian3();
 var octEncodedNormalScratch = new Cartesian2();
 var uvScratch2 = new Cartesian2();
@@ -806,6 +807,9 @@ var nwVertexScratch = new HeightAndNormal();
 var neVertexScratch = new HeightAndNormal();
 var heightmapBuffer =
   typeof Uint8Array !== "undefined" ? new Uint8Array(9 * 9) : undefined;
+var relativeToCenter2dScratch = new Cartesian3();
+var obbCenterCartographicScratch = new Cartographic();
+var obbCenter2dScratch = new Cartographic();
 
 var scratchCreateMeshSyncOptions = {
   tilingScheme: undefined,
@@ -813,6 +817,7 @@ var scratchCreateMeshSyncOptions = {
   y: 0,
   level: 0,
   exaggeration: 1.0,
+  mapProjection: undefined,
 };
 function createFillMesh(tileProvider, frameState, tile, vertexArraysToDestroy) {
   GlobeSurfaceTile.initialize(
@@ -966,6 +971,8 @@ function createFillMesh(tileProvider, frameState, tile, vertexArraysToDestroy) {
   // at levels 1, 2, and 3.
   maxTileWidth *= 1.5;
 
+  var mapProjection = frameState.mapProjection;
+
   if (
     rectangle.width > maxTileWidth &&
     maximumHeight - minimumHeight <= geometricError
@@ -986,22 +993,34 @@ function createFillMesh(tileProvider, frameState, tile, vertexArraysToDestroy) {
     createMeshSyncOptions.x = tile.x;
     createMeshSyncOptions.y = tile.y;
     createMeshSyncOptions.level = tile.level;
+    createMeshSyncOptions.mapProjection = mapProjection;
 
     fill.mesh = terrainData._createMeshSync(createMeshSyncOptions);
   } else {
+    var hasCustomProjection = !mapProjection.isNormalCylindrical;
+
+    var centerCartographic = centerCartographicScratch;
+    centerCartographic.longitude = (rectangle.east + rectangle.west) * 0.5;
+    centerCartographic.latitude = (rectangle.north + rectangle.south) * 0.5;
+    centerCartographic.height = middleHeight;
+
+    var center2D;
+    if (hasCustomProjection) {
+      center2D = mapProjection.project(
+        centerCartographic,
+        relativeToCenter2dScratch
+      );
+    }
+
     var encoding = new TerrainEncoding(
       undefined,
       undefined,
       undefined,
       undefined,
       true,
-      true
+      true,
+      center2D
     );
-
-    var centerCartographic = centerCartographicScratch;
-    centerCartographic.longitude = (rectangle.east + rectangle.west) * 0.5;
-    centerCartographic.latitude = (rectangle.north + rectangle.south) * 0.5;
-    centerCartographic.height = middleHeight;
     encoding.center = ellipsoid.cartographicToCartesian(
       centerCartographic,
       encoding.center
@@ -1054,7 +1073,8 @@ function createFillMesh(tileProvider, frameState, tile, vertexArraysToDestroy) {
       nwCorner.height,
       nwCorner.encodedNormal,
       1.0,
-      heightRange
+      heightRange,
+      mapProjection
     );
     nextIndex = addEdge(
       fill,
@@ -1079,7 +1099,8 @@ function createFillMesh(tileProvider, frameState, tile, vertexArraysToDestroy) {
       swCorner.height,
       swCorner.encodedNormal,
       0.0,
-      heightRange
+      heightRange,
+      mapProjection
     );
     nextIndex = addEdge(
       fill,
@@ -1104,7 +1125,8 @@ function createFillMesh(tileProvider, frameState, tile, vertexArraysToDestroy) {
       seCorner.height,
       seCorner.encodedNormal,
       0.0,
-      heightRange
+      heightRange,
+      mapProjection
     );
     nextIndex = addEdge(
       fill,
@@ -1129,7 +1151,8 @@ function createFillMesh(tileProvider, frameState, tile, vertexArraysToDestroy) {
       neCorner.height,
       neCorner.encodedNormal,
       1.0,
-      heightRange
+      heightRange,
+      mapProjection
     );
     nextIndex = addEdge(
       fill,
@@ -1178,15 +1201,37 @@ function createFillMesh(tileProvider, frameState, tile, vertexArraysToDestroy) {
     );
 
     var centerIndex = nextIndex;
-    encoding.encode(
-      typedArray,
-      nextIndex * stride,
-      obb.center,
-      Cartesian2.fromElements(0.5, 0.5, uvScratch),
-      middleHeight,
-      centerEncodedNormal,
-      centerWebMercatorT
-    );
+    var obbCenter = obb.center;
+    if (hasCustomProjection) {
+      var obbCenterCartographic = ellipsoid.cartesianToCartographic(
+        obbCenter,
+        obbCenterCartographicScratch
+      );
+      var obbCenter2D = mapProjection.project(
+        obbCenterCartographic,
+        obbCenter2dScratch
+      );
+      encoding.encode(
+        typedArray,
+        nextIndex * stride,
+        obbCenter,
+        Cartesian2.fromElements(0.5, 0.5, uvScratch),
+        middleHeight,
+        centerEncodedNormal,
+        centerWebMercatorT,
+        obbCenter2D
+      );
+    } else {
+      encoding.encode(
+        typedArray,
+        nextIndex * stride,
+        obbCenter,
+        Cartesian2.fromElements(0.5, 0.5, uvScratch),
+        middleHeight,
+        centerEncodedNormal,
+        centerWebMercatorT
+      );
+    }
     ++nextIndex;
 
     var vertexCount = nextIndex;
@@ -1334,7 +1379,8 @@ function addVertexWithComputedPosition(
   height,
   encodedNormal,
   webMercatorT,
-  heightRange
+  heightRange,
+  mapProjection
 ) {
   var cartographic = cartographicScratch;
   cartographic.longitude = CesiumMath.lerp(rectangle.west, rectangle.east, u);
@@ -1349,15 +1395,32 @@ function addVertexWithComputedPosition(
   uv.x = u;
   uv.y = v;
 
-  encoding.encode(
-    buffer,
-    index * encoding.getStride(),
-    position,
-    uv,
-    height,
-    encodedNormal,
-    webMercatorT
-  );
+  if (encoding.hasPositions2D) {
+    var position2D = mapProjection.project(
+      cartographic,
+      projectedCartesianScratch
+    );
+    encoding.encode(
+      buffer,
+      index * encoding.getStride(),
+      position,
+      uv,
+      height,
+      encodedNormal,
+      webMercatorT,
+      position2D
+    );
+  } else {
+    encoding.encode(
+      buffer,
+      index * encoding.getStride(),
+      position,
+      uv,
+      height,
+      encodedNormal,
+      webMercatorT
+    );
+  }
 
   heightRange.minimumHeight = Math.min(heightRange.minimumHeight, height);
   heightRange.maximumHeight = Math.max(heightRange.maximumHeight, height);
@@ -1920,15 +1983,33 @@ function addEdgeMesh(
         oneOverMercatorHeight;
     }
 
-    encoding.encode(
-      typedArray,
-      nextIndex * targetStride,
-      position,
-      uv,
-      height,
-      normal,
-      webMercatorT
-    );
+    if (encoding.hasPositions2D) {
+      var position2D = sourceEncoding.decodePosition2D(
+        sourceVertices,
+        index,
+        projectedCartesianScratch
+      );
+      encoding.encode(
+        typedArray,
+        nextIndex * targetStride,
+        position,
+        uv,
+        height,
+        normal,
+        webMercatorT,
+        position2D
+      );
+    } else {
+      encoding.encode(
+        typedArray,
+        nextIndex * targetStride,
+        position,
+        uv,
+        height,
+        normal,
+        webMercatorT
+      );
+    }
 
     heightRange.minimumHeight = Math.min(heightRange.minimumHeight, height);
     heightRange.maximumHeight = Math.max(heightRange.maximumHeight, height);

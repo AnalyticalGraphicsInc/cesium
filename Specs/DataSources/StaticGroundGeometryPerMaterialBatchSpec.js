@@ -3,6 +3,7 @@ import { Cartesian2 } from "../../Source/Cesium.js";
 import { Cartesian3 } from "../../Source/Cesium.js";
 import { Color } from "../../Source/Cesium.js";
 import { DistanceDisplayCondition } from "../../Source/Cesium.js";
+import { GeographicProjection } from "../../Source/Cesium.js";
 import { JulianDate } from "../../Source/Cesium.js";
 import { Math as CesiumMath } from "../../Source/Cesium.js";
 import { TimeInterval } from "../../Source/Cesium.js";
@@ -51,7 +52,8 @@ describe("DataSources/StaticGroundGeometryPerMaterialBatch", function () {
     var batch = new StaticGroundGeometryPerMaterialBatch(
       scene.primitives,
       ClassificationType.BOTH,
-      MaterialAppearance
+      MaterialAppearance,
+      new GeographicProjection()
     );
 
     var ellipse = new EllipseGraphics();
@@ -138,7 +140,8 @@ describe("DataSources/StaticGroundGeometryPerMaterialBatch", function () {
     var batch = new StaticGroundGeometryPerMaterialBatch(
       scene.primitives,
       ClassificationType.BOTH,
-      MaterialAppearance
+      MaterialAppearance,
+      new GeographicProjection()
     );
 
     var updater = new EllipseGeometryUpdater(entity, scene);
@@ -205,7 +208,8 @@ describe("DataSources/StaticGroundGeometryPerMaterialBatch", function () {
     var batch = new StaticGroundGeometryPerMaterialBatch(
       scene.primitives,
       ClassificationType.BOTH,
-      MaterialAppearance
+      MaterialAppearance,
+      new GeographicProjection()
     );
 
     var updater = new EllipseGeometryUpdater(entity, scene);
@@ -245,7 +249,8 @@ describe("DataSources/StaticGroundGeometryPerMaterialBatch", function () {
     var batch = new StaticGroundGeometryPerMaterialBatch(
       scene.primitives,
       ClassificationType.BOTH,
-      MaterialAppearance
+      MaterialAppearance,
+      new GeographicProjection()
     );
 
     function buildEntity(x, y, z) {
@@ -326,7 +331,8 @@ describe("DataSources/StaticGroundGeometryPerMaterialBatch", function () {
     var batch = new StaticGroundGeometryPerMaterialBatch(
       scene.primitives,
       ClassificationType.BOTH,
-      MaterialAppearance
+      MaterialAppearance,
+      new GeographicProjection()
     );
 
     var ellipse = new EllipseGraphics();
@@ -378,7 +384,8 @@ describe("DataSources/StaticGroundGeometryPerMaterialBatch", function () {
     var batch = new StaticGroundGeometryPerMaterialBatch(
       scene.primitives,
       ClassificationType.BOTH,
-      MaterialAppearance
+      MaterialAppearance,
+      new GeographicProjection()
     );
     var entity = new Entity({
       position: new Cartesian3(1234, 5678, 9101112),
@@ -431,7 +438,8 @@ describe("DataSources/StaticGroundGeometryPerMaterialBatch", function () {
     var batch = new StaticGroundGeometryPerMaterialBatch(
       scene.primitives,
       ClassificationType.BOTH,
-      MaterialAppearance
+      MaterialAppearance,
+      new GeographicProjection()
     );
 
     function buildEntity(x, y, z) {

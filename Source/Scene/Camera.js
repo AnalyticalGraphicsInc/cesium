@@ -15,6 +15,7 @@ import HeadingPitchRange from "../Core/HeadingPitchRange.js";
 import HeadingPitchRoll from "../Core/HeadingPitchRoll.js";
 import Intersect from "../Core/Intersect.js";
 import IntersectionTests from "../Core/IntersectionTests.js";
+import MapProjection from "../Core/MapProjection.js";
 import CesiumMath from "../Core/Math.js";
 import Matrix3 from "../Core/Matrix3.js";
 import Matrix4 from "../Core/Matrix4.js";
@@ -214,8 +215,9 @@ function Camera(scene) {
   this._modeChanged = true;
   var projection = scene.mapProjection;
   this._projection = projection;
-  this._maxCoord = projection.project(
-    new Cartographic(Math.PI, CesiumMath.PI_OVER_TWO)
+  this._maxCoord = MapProjection.approximateMaximumCoordinate(
+    projection,
+    new Cartesian2()
   );
   this._max2Dfrustum = undefined;
 
@@ -911,8 +913,12 @@ Object.defineProperties(Camera.prototype, {
    */
   heading: {
     get: function () {
-      if (this._mode !== SceneMode.MORPHING) {
-        var ellipsoid = this._projection.ellipsoid;
+      var projection = this._projection;
+      if (this._mode === SceneMode.SCENE2D && !projection.isNormalCylindrical) {
+        updateMembers(this);
+        return approximateHeading2D(projection, this._position, this.up);
+      } else if (this._mode !== SceneMode.MORPHING) {
+        var ellipsoid = projection.ellipsoid;
 
         var oldTransform = Matrix4.clone(this._transform, scratchHPRMatrix1);
         var transform = Transforms.eastNorthUpToFixedFrame(
@@ -1248,10 +1254,10 @@ function setView2D(camera, position, hpr, convert) {
     scratchSetViewTransform1
   );
   camera._setTransform(Matrix4.IDENTITY);
+  var projection = camera._projection;
 
   if (!Cartesian3.equals(position, camera.positionWC)) {
     if (convert) {
-      var projection = camera._projection;
       var cartographic = projection.ellipsoid.cartesianToCartographic(
         position,
         scratchSetViewCartographic
@@ -1274,21 +1280,31 @@ function setView2D(camera, position, hpr, convert) {
     }
   }
 
-  if (camera._scene.mapMode2D === MapMode2D.ROTATE) {
-    hpr.heading = hpr.heading - CesiumMath.PI_OVER_TWO;
-    hpr.pitch = -CesiumMath.PI_OVER_TWO;
-    hpr.roll = 0.0;
-    var rotQuat = Quaternion.fromHeadingPitchRoll(
-      hpr,
-      scratchSetViewQuaternion
-    );
-    var rotMat = Matrix3.fromQuaternion(rotQuat, scratchSetViewMatrix3);
-
-    Matrix3.getColumn(rotMat, 2, camera.up);
-    Cartesian3.cross(camera.direction, camera.up, camera.right);
-  }
-
   camera._setTransform(currentTransform);
+
+  if (camera._scene.mapMode2D === MapMode2D.ROTATE) {
+    // If the projection is normal-cylindrical,
+    // assume that heading is a similar 2D vector anywhere in 2D space.
+    if (projection.isNormalCylindrical) {
+      hpr.heading = hpr.heading - CesiumMath.PI_OVER_TWO;
+      hpr.pitch = -CesiumMath.PI_OVER_TWO;
+      hpr.roll = 0.0;
+      var rotQuat = Quaternion.fromHeadingPitchRoll(
+        hpr,
+        scratchSetViewQuaternion
+      );
+      var rotMat = Matrix3.fromQuaternion(rotQuat, scratchSetViewMatrix3);
+
+      Matrix3.getColumn(rotMat, 2, camera.up);
+      Cartesian3.cross(camera.direction, camera.up, camera.right);
+    } else {
+      // Otherwise, twist camera at its new position according to new heading
+      var currentHeading = camera.heading;
+      if (currentHeading !== hpr.heading) {
+        camera.twistRight(hpr.heading - currentHeading);
+      }
+    }
+  }
 }
 
 var scratchToHPRDirection = new Cartesian3();
@@ -1325,6 +1341,67 @@ function directionUpToHeadingPitchRoll(camera, position, orientation, result) {
   result.roll = getRoll(direction, up, right);
 
   return result;
+}
+
+var heightlessPositionScratch = new Cartesian3();
+var heightlessEndpointScratch = new Cartesian3();
+var cartographicPositionScratch = new Cartographic();
+var cartographicEndpointScratch = new Cartographic();
+var fixedFramePositionScratch = new Cartesian3();
+var fixedFrameEndpointScratch = new Cartesian3();
+var fixedFrameDirectionScratch = new Cartesian3();
+var fixedFrameToEnuScratch = new Matrix4();
+var enuDirectionScratch = new Cartesian3();
+function approximateHeading2D(projection, position, direction) {
+  var heightlessPosition = heightlessPositionScratch;
+  heightlessPosition.x = position.x;
+  heightlessPosition.y = position.y;
+  var heightlessEndpoint = heightlessEndpointScratch;
+  heightlessEndpoint.x = position.x + direction.x;
+  heightlessEndpoint.y = position.y + direction.y;
+
+  var cartographicPosition = projection.unproject(
+    heightlessPosition,
+    cartographicPositionScratch
+  );
+  var cartographicEndpoint = projection.unproject(
+    heightlessEndpoint,
+    cartographicEndpointScratch
+  );
+
+  var ellipsoid = projection.ellipsoid;
+  var fixedFramePosition = ellipsoid.cartographicToCartesian(
+    cartographicPosition,
+    fixedFramePositionScratch
+  );
+  var fixedFrameEndpoint = ellipsoid.cartographicToCartesian(
+    cartographicEndpoint,
+    fixedFrameEndpointScratch
+  );
+  var fixedFrameDirection = Cartesian3.subtract(
+    fixedFrameEndpoint,
+    fixedFramePosition,
+    fixedFrameDirectionScratch
+  );
+  var enuToFixedFrame = Transforms.eastNorthUpToFixedFrame(
+    fixedFramePosition,
+    ellipsoid,
+    fixedFrameToEnuScratch
+  );
+  var fixedFrameToEnu = Matrix4.inverse(
+    enuToFixedFrame,
+    fixedFrameToEnuScratch
+  );
+
+  var enuDirection = Matrix4.multiplyByPointAsVector(
+    fixedFrameToEnu,
+    fixedFrameDirection,
+    enuDirectionScratch
+  );
+
+  var heading =
+    Math.atan2(enuDirection.y, enuDirection.x) - CesiumMath.PI_OVER_TWO;
+  return CesiumMath.TWO_PI - CesiumMath.zeroToTwoPi(heading);
 }
 
 var scratchSetViewOptions = {

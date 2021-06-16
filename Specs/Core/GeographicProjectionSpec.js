@@ -91,4 +91,17 @@ describe("Core/GeographicProjection", function () {
       return projection.unproject();
     }).toThrowDeveloperError();
   });
+
+  it("serializes and deserializes", function () {
+    var projection = new GeographicProjection(Ellipsoid.UNIT_SPHERE);
+    var serialized = projection.serialize();
+
+    return GeographicProjection.deserialize(serialized).then(function (
+      deserializedProjection
+    ) {
+      expect(
+        projection.ellipsoid.equals(deserializedProjection.ellipsoid)
+      ).toBe(true);
+    });
+  });
 });

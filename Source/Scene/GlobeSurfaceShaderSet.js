@@ -114,6 +114,13 @@ GlobeSurfaceShaderSet.prototype.getShaderProgram = function (options) {
     quantizationDefine = "QUANTIZATION_BITS12";
   }
 
+  var positions2d = 0;
+  var positions2dDefine = "";
+  if (!frameState.mapProjection.isNormalCylindrical) {
+    positions2d = 1;
+    positions2dDefine = "POSITIONS_2D";
+  }
+
   var cartographicLimitRectangleFlag = 0;
   var cartographicLimitRectangleDefine = "";
   if (clippedByBoundaries) {
@@ -157,7 +164,8 @@ GlobeSurfaceShaderSet.prototype.getShaderProgram = function (options) {
     (colorToAlpha << 25) |
     (showUndergroundColor << 26) |
     (translucent << 27) |
-    (applyDayNightAlpha << 28);
+    (applyDayNightAlpha << 28) |
+    (positions2d << 29);
 
   var currentClippingShaderState = 0;
   if (defined(clippingPlanes) && clippingPlanes.length > 0) {
@@ -198,7 +206,7 @@ GlobeSurfaceShaderSet.prototype.getShaderProgram = function (options) {
       ); // Need to go before GlobeFS
     }
 
-    vs.defines.push(quantizationDefine);
+    vs.defines.push(quantizationDefine, positions2dDefine);
     fs.defines.push(
       "TEXTURE_UNITS " + numberOfDayTextures,
       cartographicLimitRectangleDefine,

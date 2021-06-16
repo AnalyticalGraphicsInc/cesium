@@ -68,7 +68,6 @@ function GlobeSurfaceTile() {
 
   this.surfaceShader = undefined;
   this.isClipped = true;
-
   this.clippedByBoundaries = false;
 }
 
@@ -637,6 +636,7 @@ var scratchCreateMeshOptions = {
   level: 0,
   exaggeration: 1.0,
   throttle: true,
+  serializedMapProjection: undefined,
 };
 
 function transform(surfaceTile, frameState, terrainProvider, x, y, level) {
@@ -649,6 +649,8 @@ function transform(surfaceTile, frameState, terrainProvider, x, y, level) {
   createMeshOptions.level = level;
   createMeshOptions.exaggeration = frameState.terrainExaggeration;
   createMeshOptions.throttle = true;
+  createMeshOptions.serializedMapProjection =
+    frameState.serializedMapProjection;
 
   var terrainData = surfaceTile.terrainData;
   var meshPromise = terrainData.createMesh(createMeshOptions);

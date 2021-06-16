@@ -1,3 +1,4 @@
+import Cartesian3 from "./Cartesian3.js";
 import Cartographic from "./Cartographic.js";
 import Check from "./Check.js";
 import defaultValue from "./defaultValue.js";
@@ -891,6 +892,291 @@ Rectangle.subsample = function (rectangle, ellipsoid, surfaceHeight, result) {
     length++;
   }
   result.length = length;
+  return result;
+};
+
+var unprojectedScratch = new Cartographic();
+var cornerScratch = new Cartographic();
+var projectedScratch = new Cartesian3();
+/**
+ * Approximates a Cartographic rectangle's extents in some map projection by projecting
+ * points in a grid throughout the rectangle.
+ *
+ * @function
+ *
+ * @param {Object} options Object with the following properties:
+ * @param {Rectangle} options.cartographicRectangle An input rectangle in geographic coordinates.
+ * @param {MapProjection} options.mapProjection A MapProjection indicating a projection from geographic coordinates.
+ * @param {Number} [options.steps=8] Number of points to sample along each side of the geographic Rectangle.
+ * @param {Rectangle} [result] Rectangle on which to store the projected extents of the input.
+ */
+Rectangle.approximateProjectedExtents = function (options, result) {
+  options = defaultValue(options, defaultValue.EMPTY_OBJECT);
+
+  //>>includeStart('debug', pragmas.debug);
+  Check.defined("cartographicRectangle", options.cartographicRectangle);
+  Check.defined("mapProjection", options.mapProjection);
+  //>>includeEnd('debug');
+
+  var cartographicRectangle = options.cartographicRectangle;
+  var mapProjection = options.mapProjection;
+  var steps = defaultValue(options.steps, 8);
+
+  if (!defined(result)) {
+    result = new Rectangle();
+  }
+
+  result.west = Number.MAX_VALUE;
+  result.east = -Number.MAX_VALUE;
+  result.south = Number.MAX_VALUE;
+  result.north = -Number.MAX_VALUE;
+
+  var geographicCorner = Rectangle.southwest(
+    cartographicRectangle,
+    cornerScratch
+  );
+  var geographicWidth = cartographicRectangle.width;
+  var geographicHeight = cartographicRectangle.height;
+
+  var geographicWidthStep = geographicWidth / (steps - 1);
+  var geographicHeightStep = geographicHeight / (steps - 1);
+
+  var projected = projectedScratch;
+  var unprojected = unprojectedScratch;
+
+  for (var longIndex = 0; longIndex < steps; longIndex++) {
+    for (var latIndex = 0; latIndex < steps; latIndex++) {
+      unprojected.longitude =
+        geographicCorner.longitude + geographicWidthStep * longIndex;
+      unprojected.latitude =
+        geographicCorner.latitude + geographicHeightStep * latIndex;
+
+      mapProjection.project(unprojected, projected);
+      result.west = Math.min(result.west, projected.x);
+      result.east = Math.max(result.east, projected.x);
+      result.south = Math.min(result.south, projected.y);
+      result.north = Math.max(result.north, projected.y);
+    }
+  }
+
+  return result;
+};
+
+function unprojectAndSetRectangle(
+  mapProjection,
+  projected,
+  unprojected,
+  result
+) {
+  mapProjection.unproject(projected, unprojected);
+  result.west = Math.min(result.west, unprojected.longitude);
+  result.east = Math.max(result.east, unprojected.longitude);
+  result.south = Math.min(result.south, unprojected.latitude);
+  result.north = Math.max(result.north, unprojected.latitude);
+}
+
+var northPole = new Cartographic(0, CesiumMath.PI_OVER_TWO);
+var southPole = new Cartographic(0, -CesiumMath.PI_OVER_TWO);
+var projectedPoleScratch = new Cartographic();
+/**
+ * Approximates a projected rectangle's extents in Cartographic space by unprojecting
+ * points along the Rectangle's boundary, checking the poles, and guessing whether or not
+ * the projected rectangle crosses the IDL.
+ *
+ * Takes into account map projection boundaries.
+ *
+ * @function
+ *
+ * @param {Object} options Object with the following properties:
+ * @param {Rectangle} projectedRectangle An input rectangle in projected coordinates
+ * @param {MapProjection} mapProjection A MapProjection indicating a projection from cartographic coordiantes.
+ * @param {Rectangle} [result] Rectangle on which to store the projected extents of the input.
+ * @param {Number} [steps=16] Number of points to sample along each side of the projected Rectangle.
+ */
+Rectangle.approximateCartographicExtents = function (options, result) {
+  options = defaultValue(options, defaultValue.EMPTY_OBJECT);
+
+  //>>includeStart('debug', pragmas.debug);
+  Check.defined("projectedRectangle", options.projectedRectangle);
+  Check.defined("mapProjection", options.mapProjection);
+  //>>includeEnd('debug');
+
+  var projectedRectangle = options.projectedRectangle;
+  var mapProjection = options.mapProjection;
+  var steps = defaultValue(options.steps, 16);
+
+  if (!defined(result)) {
+    result = new Rectangle();
+  }
+
+  result.west = Number.MAX_VALUE;
+  result.east = -Number.MAX_VALUE;
+  result.south = Number.MAX_VALUE;
+  result.north = -Number.MAX_VALUE;
+
+  var idlCrossWest = Number.MAX_VALUE;
+  var idlCrossEast = -Number.MAX_VALUE;
+
+  var projectedCorner = Rectangle.southwest(projectedRectangle, cornerScratch);
+  var projectedWidth = projectedRectangle.width;
+  var projectedHeight = projectedRectangle.height;
+  var projectedWidthStep = projectedWidth / (steps - 1);
+  var projectedHeightStep = projectedHeight / (steps - 1);
+  var crossedIdl = false;
+  var lastLongitudeTop = 0.0;
+  var lastLongitudeBottom = 0.0;
+
+  var projected = projectedScratch;
+  var unprojected = unprojectedScratch;
+  for (var longIndex = 0; longIndex < steps; longIndex++) {
+    projected.x = projectedCorner.longitude + projectedWidthStep * longIndex;
+    projected.y = projectedCorner.latitude;
+
+    unprojectAndSetRectangle(mapProjection, projected, unprojected, result);
+
+    if (
+      longIndex !== 0 &&
+      !CesiumMath.equalsEpsilon(
+        Math.abs(unprojected.longitude),
+        CesiumMath.PI,
+        CesiumMath.EPSILON14
+      )
+    ) {
+      crossedIdl =
+        crossedIdl ||
+        Math.abs(lastLongitudeTop - unprojected.longitude) > CesiumMath.PI;
+    }
+    lastLongitudeTop = unprojected.longitude;
+
+    idlCrossWest =
+      unprojected.longitude > 0.0
+        ? Math.min(idlCrossWest, unprojected.longitude)
+        : idlCrossWest;
+    idlCrossEast =
+      unprojected.longitude < 0.0
+        ? Math.max(idlCrossEast, unprojected.longitude)
+        : idlCrossEast;
+
+    projected.y = projectedCorner.latitude + projectedHeight;
+
+    unprojectAndSetRectangle(mapProjection, projected, unprojected, result);
+
+    if (
+      longIndex !== 0 &&
+      !CesiumMath.equalsEpsilon(
+        Math.abs(unprojected.longitude),
+        CesiumMath.PI,
+        CesiumMath.EPSILON14
+      )
+    ) {
+      crossedIdl =
+        crossedIdl ||
+        Math.abs(lastLongitudeBottom - unprojected.longitude) > CesiumMath.PI;
+    }
+    lastLongitudeBottom = unprojected.longitude;
+
+    idlCrossWest =
+      unprojected.longitude > 0.0
+        ? Math.min(idlCrossWest, unprojected.longitude)
+        : idlCrossWest;
+    idlCrossEast =
+      unprojected.longitude < 0.0
+        ? Math.max(idlCrossEast, unprojected.longitude)
+        : idlCrossEast;
+  }
+
+  for (var latIndex = 0; latIndex < steps; latIndex++) {
+    projected.y = projectedCorner.latitude + projectedHeightStep * latIndex;
+    projected.x = projectedCorner.longitude;
+
+    unprojectAndSetRectangle(mapProjection, projected, unprojected, result);
+
+    idlCrossWest =
+      unprojected.longitude > 0.0
+        ? Math.min(idlCrossWest, unprojected.longitude)
+        : idlCrossWest;
+    idlCrossEast =
+      unprojected.longitude < 0.0
+        ? Math.max(idlCrossEast, unprojected.longitude)
+        : idlCrossEast;
+
+    projected.x = projectedCorner.longitude + projectedWidth;
+
+    unprojectAndSetRectangle(mapProjection, projected, unprojected, result);
+
+    idlCrossWest =
+      unprojected.longitude > 0.0
+        ? Math.min(idlCrossWest, unprojected.longitude)
+        : idlCrossWest;
+    idlCrossEast =
+      unprojected.longitude < 0.0
+        ? Math.max(idlCrossEast, unprojected.longitude)
+        : idlCrossEast;
+  }
+
+  // Check if either pole is in the projected rectangle
+  var projectionBounds = defaultValue(
+    mapProjection.wgs84Bounds,
+    Rectangle.MAX_VALUE
+  );
+  var containsPole;
+
+  var projectedNorthPole = mapProjection.project(northPole, projectedScratch);
+  var projectedNorthPoleCartographic = projectedPoleScratch;
+  projectedNorthPoleCartographic.longitude = projectedNorthPole.x;
+  projectedNorthPoleCartographic.latitude = projectedNorthPole.y;
+  if (
+    Rectangle.contains(projectionBounds, northPole) &&
+    Rectangle.contains(projectedRectangle, projectedNorthPoleCartographic)
+  ) {
+    result.north = CesiumMath.PI_OVER_TWO;
+    result.west = -CesiumMath.PI;
+    result.east = CesiumMath.PI;
+    containsPole = true;
+  }
+
+  var projectedSouthPole = mapProjection.project(southPole, projectedScratch);
+  var projectedSouthPoleCartographic = projectedPoleScratch;
+  projectedSouthPoleCartographic.longitude = projectedSouthPole.x;
+  projectedSouthPoleCartographic.latitude = projectedSouthPole.y;
+  if (
+    Rectangle.contains(projectionBounds, southPole) &&
+    Rectangle.contains(projectedRectangle, projectedSouthPoleCartographic)
+  ) {
+    result.south = -CesiumMath.PI_OVER_TWO;
+    result.west = -CesiumMath.PI;
+    result.east = CesiumMath.PI;
+    containsPole = true;
+  }
+
+  // Check if the rectangle crosses the IDL
+  if (!containsPole && crossedIdl) {
+    result.west = idlCrossWest;
+    result.east = idlCrossEast;
+  }
+
+  // Clamp
+  result.west = CesiumMath.clamp(
+    result.west,
+    projectionBounds.west,
+    projectionBounds.east
+  );
+  result.east = CesiumMath.clamp(
+    result.east,
+    projectionBounds.west,
+    projectionBounds.east
+  );
+  result.south = CesiumMath.clamp(
+    result.south,
+    projectionBounds.south,
+    projectionBounds.north
+  );
+  result.north = CesiumMath.clamp(
+    result.north,
+    projectionBounds.south,
+    projectionBounds.north
+  );
+
   return result;
 };
 

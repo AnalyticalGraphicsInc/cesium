@@ -701,9 +701,9 @@ describe("Core/GroundPolylineGeometry", function () {
       granularity: 10.0, // no interpolative subdivision
     });
     groundPolylineGeometry._scene3DOnly = true;
-    GroundPolylineGeometry.setProjectionAndEllipsoid(
+    GroundPolylineGeometry.setProjection(
       groundPolylineGeometry,
-      new WebMercatorProjection(Ellipsoid.UNIT_SPHERE)
+      new WebMercatorProjection(Ellipsoid.WGS84)
     );
 
     var packedArray = [0];
@@ -729,9 +729,7 @@ describe("Core/GroundPolylineGeometry", function () {
     ).toBe(true);
     expect(scratch.loop).toBe(true);
     expect(scratch.granularity).toEqual(10.0);
-    expect(scratch._ellipsoid.equals(Ellipsoid.UNIT_SPHERE)).toBe(true);
     expect(scratch._scene3DOnly).toBe(true);
-    expect(scratch._projectionIndex).toEqual(1);
   });
 
   it("can unpack onto a new instance", function () {
@@ -741,7 +739,7 @@ describe("Core/GroundPolylineGeometry", function () {
       granularity: 10.0, // no interpolative subdivision
     });
     groundPolylineGeometry._scene3DOnly = true;
-    GroundPolylineGeometry.setProjectionAndEllipsoid(
+    GroundPolylineGeometry.setProjection(
       groundPolylineGeometry,
       new WebMercatorProjection(Ellipsoid.UNIT_SPHERE)
     );
@@ -766,27 +764,20 @@ describe("Core/GroundPolylineGeometry", function () {
     ).toBe(true);
     expect(result.loop).toBe(true);
     expect(result.granularity).toEqual(10.0);
-    expect(result._ellipsoid.equals(Ellipsoid.UNIT_SPHERE)).toBe(true);
     expect(result._scene3DOnly).toBe(true);
-    expect(result._projectionIndex).toEqual(1);
   });
 
-  it("provides a method for setting projection and ellipsoid", function () {
+  it("provides a method for setting projection", function () {
     var groundPolylineGeometry = new GroundPolylineGeometry({
       positions: Cartesian3.fromDegreesArray([-1.0, 0.0, 1.0, 0.0]),
       loop: true,
       granularity: 10.0, // no interpolative subdivision
     });
 
-    GroundPolylineGeometry.setProjectionAndEllipsoid(
-      groundPolylineGeometry,
-      new WebMercatorProjection(Ellipsoid.UNIT_SPHERE)
-    );
+    var projection = new WebMercatorProjection(Ellipsoid.UNIT_SPHERE);
+    GroundPolylineGeometry.setProjection(groundPolylineGeometry, projection);
 
-    expect(groundPolylineGeometry._projectionIndex).toEqual(1);
-    expect(
-      groundPolylineGeometry._ellipsoid.equals(Ellipsoid.UNIT_SPHERE)
-    ).toBe(true);
+    expect(groundPolylineGeometry._projection).toEqual(projection);
   });
 
   var positions = Cartesian3.fromDegreesArray([
@@ -861,10 +852,6 @@ describe("Core/GroundPolylineGeometry", function () {
   packedInstance.push(polyline.granularity);
   packedInstance.push(polyline.loop ? 1.0 : 0.0);
   packedInstance.push(polyline.arcType);
-
-  Ellipsoid.pack(Ellipsoid.WGS84, packedInstance, packedInstance.length);
-
-  packedInstance.push(0.0); // projection index for Geographic (default)
   packedInstance.push(0.0); // scene3DModeOnly = false
 
   createPackableSpecs(GroundPolylineGeometry, polyline, packedInstance);

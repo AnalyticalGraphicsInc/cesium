@@ -6,6 +6,7 @@ import { Cartesian4 } from "../../Source/Cesium.js";
 import { createWorldTerrain } from "../../Source/Cesium.js";
 import { Ellipsoid } from "../../Source/Cesium.js";
 import { EllipsoidTerrainProvider } from "../../Source/Cesium.js";
+import { GeographicProjection } from "../../Source/Cesium.js";
 import { GeographicTilingScheme } from "../../Source/Cesium.js";
 import { Ray } from "../../Source/Cesium.js";
 import { GlobeSurfaceTile } from "../../Source/Cesium.js";
@@ -27,10 +28,13 @@ describe("Scene/GlobeSurfaceTile", function () {
   var processor;
 
   beforeEach(function () {
+    var mapProjection = new GeographicProjection();
     frameState = {
       context: {
         cache: {},
       },
+      mapProjection: mapProjection,
+      serializedMapProjection: mapProjection.serialize(),
     };
 
     tilingScheme = new GeographicTilingScheme();

@@ -2,7 +2,11 @@ import ApproximateTerrainHeights from "../Core/ApproximateTerrainHeights.js";
 import defined from "../Core/defined.js";
 import GroundPolylineGeometry from "../Core/GroundPolylineGeometry.js";
 
-function createGroundPolylineGeometry(groundPolylineGeometry, offset) {
+function createGroundPolylineGeometry(
+  groundPolylineGeometry,
+  offset,
+  mapProjection
+) {
   return ApproximateTerrainHeights.initialize().then(function () {
     if (defined(offset)) {
       groundPolylineGeometry = GroundPolylineGeometry.unpack(
@@ -10,6 +14,7 @@ function createGroundPolylineGeometry(groundPolylineGeometry, offset) {
         offset
       );
     }
+    GroundPolylineGeometry.setProjection(groundPolylineGeometry, mapProjection);
     return GroundPolylineGeometry.createGeometry(groundPolylineGeometry);
   });
 }

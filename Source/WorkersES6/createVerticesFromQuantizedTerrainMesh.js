@@ -5,6 +5,7 @@ import Cartesian2 from "../Core/Cartesian2.js";
 import Cartesian3 from "../Core/Cartesian3.js";
 import Cartographic from "../Core/Cartographic.js";
 import defined from "../Core/defined.js";
+import deserializeMapProjection from "../Core/deserializeMapProjection.js";
 import Ellipsoid from "../Core/Ellipsoid.js";
 import EllipsoidalOccluder from "../Core/EllipsoidalOccluder.js";
 import IndexDatatype from "../Core/IndexDatatype.js";
@@ -20,6 +21,17 @@ import createTaskProcessorWorker from "./createTaskProcessorWorker.js";
 
 var maxShort = 32767;
 
+function createVerticesFromQuantizedTerrainMesh(
+  parameters,
+  transferableObjects
+) {
+  return deserializeMapProjection(parameters.serializedMapProjection).then(
+    function (mapProjection) {
+      return implementation(parameters, transferableObjects, mapProjection);
+    }
+  );
+}
+
 var cartesian3Scratch = new Cartesian3();
 var scratchMinimum = new Cartesian3();
 var scratchMaximum = new Cartesian3();
@@ -28,11 +40,10 @@ var toPack = new Cartesian2();
 var scratchNormal = new Cartesian3();
 var scratchToENU = new Matrix4();
 var scratchFromENU = new Matrix4();
-
-function createVerticesFromQuantizedTerrainMesh(
-  parameters,
-  transferableObjects
-) {
+var projectedCartesian3Scratch = new Cartesian3();
+var projectedCartographicScratch = new Cartographic();
+var relativeToCenter2dScratch = new Cartesian3();
+function implementation(parameters, transferableObjects, mapProjection) {
   var quantizedVertices = parameters.quantizedVertices;
   var quantizedVertexCount = quantizedVertices.length / 3;
   var octEncodedNormals = parameters.octEncodedNormals;
@@ -58,6 +69,8 @@ function createVerticesFromQuantizedTerrainMesh(
   var center = parameters.relativeToCenter;
   var fromENU = Transforms.eastNorthUpToFixedFrame(center, ellipsoid);
   var toENU = Matrix4.inverseTransformation(fromENU, new Matrix4());
+
+  var hasCustomProjection = !mapProjection.isNormalCylindrical;
 
   var southMercatorY;
   var oneOverMercatorHeight;
@@ -88,6 +101,22 @@ function createVerticesFromQuantizedTerrainMesh(
   var webMercatorTs = includeWebMercatorT
     ? new Array(quantizedVertexCount)
     : [];
+  var positions2D;
+  if (hasCustomProjection) {
+    positions2D = new Array(quantizedVertexCount);
+  }
+
+  var relativeToCenter2D;
+  if (hasCustomProjection) {
+    var cartographicRTC = ellipsoid.cartesianToCartographic(
+      center,
+      projectedCartographicScratch
+    );
+    relativeToCenter2D = mapProjection.project(
+      cartographicRTC,
+      relativeToCenter2dScratch
+    );
+  }
 
   var minimum = scratchMinimum;
   minimum.x = Number.POSITIVE_INFINITY;
@@ -130,6 +159,9 @@ function createVerticesFromQuantizedTerrainMesh(
     uvs[i] = new Cartesian2(u, v);
     heights[i] = height;
     positions[i] = position;
+    if (hasCustomProjection) {
+      positions2D[i] = mapProjection.project(cartographicScratch);
+    }
 
     if (includeWebMercatorT) {
       webMercatorTs[i] =
@@ -261,7 +293,8 @@ function createVerticesFromQuantizedTerrainMesh(
     maximumHeight,
     fromENU,
     hasVertexNormals,
-    includeWebMercatorT
+    includeWebMercatorT,
+    relativeToCenter2D
   );
   var vertexStride = encoding.getStride();
   var size =
@@ -302,15 +335,28 @@ function createVerticesFromQuantizedTerrainMesh(
       }
     }
 
-    bufferIndex = encoding.encode(
-      vertexBuffer,
-      bufferIndex,
-      positions[j],
-      uvs[j],
-      heights[j],
-      toPack,
-      webMercatorTs[j]
-    );
+    if (hasCustomProjection) {
+      bufferIndex = encoding.encode(
+        vertexBuffer,
+        bufferIndex,
+        positions[j],
+        uvs[j],
+        heights[j],
+        toPack,
+        webMercatorTs[j],
+        positions2D[j]
+      );
+    } else {
+      bufferIndex = encoding.encode(
+        vertexBuffer,
+        bufferIndex,
+        positions[j],
+        uvs[j],
+        heights[j],
+        toPack,
+        webMercatorTs[j]
+      );
+    }
   }
 
   var edgeTriangleCount = Math.max(0, (edgeVertexCount - 4) * 2);
@@ -350,7 +396,8 @@ function createVerticesFromQuantizedTerrainMesh(
     southMercatorY,
     oneOverMercatorHeight,
     westLongitudeOffset,
-    westLatitudeOffset
+    westLatitudeOffset,
+    mapProjection
   );
   vertexBufferIndex += parameters.westIndices.length * vertexStride;
   addSkirt(
@@ -368,7 +415,8 @@ function createVerticesFromQuantizedTerrainMesh(
     southMercatorY,
     oneOverMercatorHeight,
     southLongitudeOffset,
-    southLatitudeOffset
+    southLatitudeOffset,
+    mapProjection
   );
   vertexBufferIndex += parameters.southIndices.length * vertexStride;
   addSkirt(
@@ -386,7 +434,8 @@ function createVerticesFromQuantizedTerrainMesh(
     southMercatorY,
     oneOverMercatorHeight,
     eastLongitudeOffset,
-    eastLatitudeOffset
+    eastLatitudeOffset,
+    mapProjection
   );
   vertexBufferIndex += parameters.eastIndices.length * vertexStride;
   addSkirt(
@@ -404,7 +453,8 @@ function createVerticesFromQuantizedTerrainMesh(
     southMercatorY,
     oneOverMercatorHeight,
     northLongitudeOffset,
-    northLatitudeOffset
+    northLatitudeOffset,
+    mapProjection
   );
 
   TerrainProvider.addSkirtIndices(
@@ -484,6 +534,7 @@ function findMinMaxSkirts(
   return hMin;
 }
 
+var skirtCartesian2Scratch = new Cartesian2();
 function addSkirt(
   vertexBuffer,
   vertexBufferIndex,
@@ -499,7 +550,8 @@ function addSkirt(
   southMercatorY,
   oneOverMercatorHeight,
   longitudeOffset,
-  latitudeOffset
+  latitudeOffset,
+  mapProjection
 ) {
   var hasVertexNormals = defined(octEncodedNormals);
 
@@ -512,6 +564,7 @@ function addSkirt(
     east += CesiumMath.TWO_PI;
   }
 
+  var hasCustomProjection = !mapProjection.isNormalCylindrical;
   var length = edgeVertices.length;
   for (var i = 0; i < length; ++i) {
     var index = edgeVertices[i];
@@ -528,6 +581,21 @@ function addSkirt(
       cartographicScratch,
       cartesian3Scratch
     );
+
+    var position2D;
+    if (hasCustomProjection) {
+      position2D = skirtCartesian2Scratch;
+      var heightlessCartographic = projectedCartographicScratch;
+      heightlessCartographic.longitude = cartographicScratch.longitude;
+      heightlessCartographic.latitude = cartographicScratch.latitude;
+      heightlessCartographic.height = 0.0;
+      var projectedPosition = mapProjection.project(
+        heightlessCartographic,
+        projectedCartesian3Scratch
+      );
+      position2D.x = projectedPosition.x;
+      position2D.y = projectedPosition.y;
+    }
 
     if (hasVertexNormals) {
       var n = index * 2.0;
@@ -578,7 +646,8 @@ function addSkirt(
       uv,
       cartographicScratch.height,
       toPack,
-      webMercatorT
+      webMercatorT,
+      position2D
     );
   }
 }

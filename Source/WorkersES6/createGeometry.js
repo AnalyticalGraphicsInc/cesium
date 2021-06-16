@@ -1,5 +1,6 @@
 /* global require */
 import defined from "../Core/defined.js";
+import deserializeMapProjection from "../Core/deserializeMapProjection.js";
 import PrimitivePipeline from "../Scene/PrimitivePipeline.js";
 import when from "../ThirdParty/when.js";
 import createTaskProcessorWorker from "./createTaskProcessorWorker.js";
@@ -27,27 +28,35 @@ function getModule(moduleName) {
 function createGeometry(parameters, transferableObjects) {
   var subTasks = parameters.subTasks;
   var length = subTasks.length;
-  var resultsOrPromises = new Array(length);
+  return deserializeMapProjection(parameters.serializedMapProjection).then(
+    function (mapProjection) {
+      var resultsOrPromises = new Array(length);
 
-  for (var i = 0; i < length; i++) {
-    var task = subTasks[i];
-    var geometry = task.geometry;
-    var moduleName = task.moduleName;
+      for (var i = 0; i < length; i++) {
+        var task = subTasks[i];
+        var geometry = task.geometry;
+        var moduleName = task.moduleName;
 
-    if (defined(moduleName)) {
-      var createFunction = getModule(moduleName);
-      resultsOrPromises[i] = createFunction(geometry, task.offset);
-    } else {
-      //Already created geometry
-      resultsOrPromises[i] = geometry;
+        if (defined(moduleName)) {
+          var createFunction = getModule(moduleName);
+          resultsOrPromises[i] = createFunction(
+            geometry,
+            task.offset,
+            mapProjection
+          );
+        } else {
+          //Already created geometry
+          resultsOrPromises[i] = geometry;
+        }
+      }
+
+      return when.all(resultsOrPromises, function (results) {
+        return PrimitivePipeline.packCreateGeometryResults(
+          results,
+          transferableObjects
+        );
+      });
     }
-  }
-
-  return when.all(resultsOrPromises, function (results) {
-    return PrimitivePipeline.packCreateGeometryResults(
-      results,
-      transferableObjects
-    );
-  });
+  );
 }
 export default createTaskProcessorWorker(createGeometry);

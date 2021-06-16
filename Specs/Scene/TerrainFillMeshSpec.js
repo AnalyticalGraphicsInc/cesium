@@ -6,6 +6,7 @@ import { GeographicProjection } from "../../Source/Cesium.js";
 import { HeightmapTerrainData } from "../../Source/Cesium.js";
 import { Intersect } from "../../Source/Cesium.js";
 import { Math as CesiumMath } from "../../Source/Cesium.js";
+import { Proj4Projection } from "../../Source/Cesium.js";
 import { Camera } from "../../Source/Cesium.js";
 import { GlobeSurfaceTileProvider } from "../../Source/Cesium.js";
 import { ImageryLayerCollection } from "../../Source/Cesium.js";
@@ -37,9 +38,9 @@ describe("Scene/TerrainFillMesh", function () {
   var northwest;
   var northeast;
 
-  beforeEach(function () {
+  function terrainSetup(mapProjection, subsequentSetup) {
     scene = {
-      mapProjection: new GeographicProjection(),
+      mapProjection: mapProjection,
       drawingBufferWidth: 1000,
       drawingBufferHeight: 1000,
     };
@@ -65,6 +66,8 @@ describe("Scene/TerrainFillMesh", function () {
         "computeVisibility",
       ]),
       afterRender: [],
+      mapProjection: scene.mapProjection,
+      serializedMapProjection: scene.mapProjection.serialize(),
     };
 
     frameState.cullingVolume.computeVisibility.and.returnValue(
@@ -90,7 +93,9 @@ describe("Scene/TerrainFillMesh", function () {
       mockTerrain,
       imageryLayerCollection
     );
-    processor.mockWebGL();
+    if (!subsequentSetup) {
+      processor.mockWebGL();
+    }
 
     quadtree.render(frameState);
     rootTiles = quadtree._levelZeroTiles;
@@ -281,9 +286,13 @@ describe("Scene/TerrainFillMesh", function () {
         northeast
       )
       .createMeshWillSucceed(northeast);
-  });
+  }
 
   describe("updateFillTiles", function () {
+    beforeEach(function () {
+      terrainSetup(new GeographicProjection());
+    });
+
     it("does nothing if no rendered tiles are provided", function () {
       expect(function () {
         TerrainFillMesh.updateFillTiles(tileProvider, [], frameState);
@@ -696,6 +705,10 @@ describe("Scene/TerrainFillMesh", function () {
   });
 
   describe("update", function () {
+    beforeEach(function () {
+      terrainSetup(new GeographicProjection());
+    });
+
     it("puts a middle height at the four corners and center when there are no adjacent tiles", function () {
       return processor.process([center]).then(function () {
         center.data.tileBoundingRegion = new TileBoundingRegion({
@@ -1099,6 +1112,60 @@ describe("Scene/TerrainFillMesh", function () {
           expectVertex(fill, 1.0, 0.75, 3.0);
           expectVertex(fill, 1.0, 1.0, (3.0 + 6.0) / 2);
         });
+    });
+
+    describe("update with arbitrary projection", function () {
+      it("has positions for 2.5D projected coordinates when using an unusual projection", function () {
+        var geographicStride;
+        return processor
+          .process([center, west, south, east, north])
+          .then(function () {
+            var fill = (center.data.fill = new TerrainFillMesh(center));
+
+            fill.westTiles.push(west);
+            fill.westMeshes.push(west.data.mesh);
+            fill.southTiles.push(south);
+            fill.southMeshes.push(south.data.mesh);
+            fill.eastTiles.push(east);
+            fill.eastMeshes.push(east.data.mesh);
+            fill.northTiles.push(north);
+            fill.northMeshes.push(north.data.mesh);
+
+            fill.update(tileProvider, frameState);
+
+            geographicStride = fill.mesh.encoding.getStride();
+          })
+          .then(function () {
+            var mollweideWellKnownText =
+              "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +a=6371000 +b=6371000 +units=m +no_defs";
+            terrainSetup(
+              new Proj4Projection({
+                wellKnownText: mollweideWellKnownText,
+              }),
+              true
+            );
+            return processor.process([center, west, south, east, north]);
+          })
+          .then(function () {
+            var fill = (center.data.fill = new TerrainFillMesh(center));
+
+            fill.westTiles.push(west);
+            fill.westMeshes.push(west.data.mesh);
+            fill.southTiles.push(south);
+            fill.southMeshes.push(south.data.mesh);
+            fill.eastTiles.push(east);
+            fill.eastMeshes.push(east.data.mesh);
+            fill.northTiles.push(north);
+            fill.northMeshes.push(north.data.mesh);
+
+            fill.update(tileProvider, frameState);
+
+            expectVertexCount(fill, 9);
+            expect(fill.mesh.encoding.getStride()).toEqual(
+              geographicStride + 3
+            );
+          });
+      });
     });
 
     describe("correctly transforms texture coordinates across the anti-meridian", function () {

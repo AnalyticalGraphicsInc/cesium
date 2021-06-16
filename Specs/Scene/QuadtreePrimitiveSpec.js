@@ -62,6 +62,8 @@ describe("Scene/QuadtreePrimitive", function () {
           "computeVisibility",
         ]),
         afterRender: [],
+        mapProjection: scene.mapProjection,
+        serializedMapProjection: scene.mapProjection.serialize(),
         pixelRatio: 1.0,
         globeTranslucencyState: new GlobeTranslucencyState(),
       };

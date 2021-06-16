@@ -5,6 +5,7 @@ import Cartesian3 from "../Core/Cartesian3.js";
 import Cartographic from "../Core/Cartographic.js";
 import defaultValue from "../Core/defaultValue.js";
 import defined from "../Core/defined.js";
+import deserializeMapProjection from "../Core/deserializeMapProjection.js";
 import Ellipsoid from "../Core/Ellipsoid.js";
 import EllipsoidalOccluder from "../Core/EllipsoidalOccluder.js";
 import CesiumMath from "../Core/Math.js";
@@ -42,40 +43,45 @@ function createVerticesFromGoogleEarthEnterpriseBuffer(
   parameters.ellipsoid = Ellipsoid.clone(parameters.ellipsoid);
   parameters.rectangle = Rectangle.clone(parameters.rectangle);
 
-  var statistics = processBuffer(
-    parameters.buffer,
-    parameters.relativeToCenter,
-    parameters.ellipsoid,
-    parameters.rectangle,
-    parameters.nativeRectangle,
-    parameters.exaggeration,
-    parameters.skirtHeight,
-    parameters.includeWebMercatorT,
-    parameters.negativeAltitudeExponentBias,
-    parameters.negativeElevationThreshold
-  );
-  var vertices = statistics.vertices;
-  transferableObjects.push(vertices.buffer);
-  var indices = statistics.indices;
-  transferableObjects.push(indices.buffer);
+  return deserializeMapProjection(parameters.serializedMapProjection).then(
+    function (mapProjection) {
+      var statistics = processBuffer(
+        parameters.buffer,
+        parameters.relativeToCenter,
+        parameters.ellipsoid,
+        parameters.rectangle,
+        parameters.nativeRectangle,
+        parameters.exaggeration,
+        parameters.skirtHeight,
+        parameters.includeWebMercatorT,
+        parameters.negativeAltitudeExponentBias,
+        parameters.negativeElevationThreshold,
+        mapProjection
+      );
+      var vertices = statistics.vertices;
+      transferableObjects.push(vertices.buffer);
+      var indices = statistics.indices;
+      transferableObjects.push(indices.buffer);
 
-  return {
-    vertices: vertices.buffer,
-    indices: indices.buffer,
-    numberOfAttributes: statistics.encoding.getStride(),
-    minimumHeight: statistics.minimumHeight,
-    maximumHeight: statistics.maximumHeight,
-    boundingSphere3D: statistics.boundingSphere3D,
-    orientedBoundingBox: statistics.orientedBoundingBox,
-    occludeePointInScaledSpace: statistics.occludeePointInScaledSpace,
-    encoding: statistics.encoding,
-    vertexCountWithoutSkirts: statistics.vertexCountWithoutSkirts,
-    indexCountWithoutSkirts: statistics.indexCountWithoutSkirts,
-    westIndicesSouthToNorth: statistics.westIndicesSouthToNorth,
-    southIndicesEastToWest: statistics.southIndicesEastToWest,
-    eastIndicesNorthToSouth: statistics.eastIndicesNorthToSouth,
-    northIndicesWestToEast: statistics.northIndicesWestToEast,
-  };
+      return {
+        vertices: vertices.buffer,
+        indices: indices.buffer,
+        numberOfAttributes: statistics.encoding.getStride(),
+        minimumHeight: statistics.minimumHeight,
+        maximumHeight: statistics.maximumHeight,
+        boundingSphere3D: statistics.boundingSphere3D,
+        orientedBoundingBox: statistics.orientedBoundingBox,
+        occludeePointInScaledSpace: statistics.occludeePointInScaledSpace,
+        encoding: statistics.encoding,
+        vertexCountWithoutSkirts: statistics.vertexCountWithoutSkirts,
+        indexCountWithoutSkirts: statistics.indexCountWithoutSkirts,
+        westIndicesSouthToNorth: statistics.westIndicesSouthToNorth,
+        southIndicesEastToWest: statistics.southIndicesEastToWest,
+        eastIndicesNorthToSouth: statistics.eastIndicesNorthToSouth,
+        northIndicesWestToEast: statistics.northIndicesWestToEast,
+      };
+    }
+  );
 }
 
 var scratchCartographic = new Cartographic();
@@ -83,7 +89,8 @@ var scratchCartesian = new Cartesian3();
 var minimumScratch = new Cartesian3();
 var maximumScratch = new Cartesian3();
 var matrix4Scratch = new Matrix4();
-
+var projectedCartesian3Scratch = new Cartesian3();
+var relativeToCenter2dScratch = new Cartesian3();
 function processBuffer(
   buffer,
   relativeToCenter,
@@ -94,13 +101,16 @@ function processBuffer(
   skirtHeight,
   includeWebMercatorT,
   negativeAltitudeExponentBias,
-  negativeElevationThreshold
+  negativeElevationThreshold,
+  mapProjection
 ) {
   var geographicWest;
   var geographicSouth;
   var geographicEast;
   var geographicNorth;
   var rectangleWidth, rectangleHeight;
+
+  var hasCustomProjection = !mapProjection.isNormalCylindrical;
 
   if (!defined(rectangle)) {
     geographicWest = CesiumMath.toRadians(nativeRectangle.west);
@@ -124,6 +134,18 @@ function processBuffer(
 
   var fromENU = Transforms.eastNorthUpToFixedFrame(relativeToCenter, ellipsoid);
   var toENU = Matrix4.inverseTransformation(fromENU, matrix4Scratch);
+
+  var relativeToCenter2D;
+  if (hasCustomProjection) {
+    var cartographicRTC = ellipsoid.cartesianToCartographic(
+      relativeToCenter,
+      scratchCartographic
+    );
+    relativeToCenter2D = mapProjection.project(
+      cartographicRTC,
+      relativeToCenter2dScratch
+    );
+  }
 
   var southMercatorY;
   var oneOverMercatorHeight;
@@ -193,6 +215,10 @@ function processBuffer(
 
   // Create arrays
   var positions = new Array(size);
+  var positions2D;
+  if (hasCustomProjection) {
+    positions2D = new Array(size);
+  }
   var uvs = new Array(size);
   var heights = new Array(size);
   var webMercatorTs = includeWebMercatorT ? new Array(size) : [];
@@ -309,6 +335,10 @@ function processBuffer(
       var pos = ellipsoid.cartographicToCartesian(scratchCartographic);
       positions[pointOffset] = pos;
 
+      if (hasCustomProjection) {
+        positions2D[pointOffset] = mapProjection.project(scratchCartographic);
+      }
+
       if (includeWebMercatorT) {
         webMercatorTs[pointOffset] =
           (WebMercatorProjection.geodeticLatitudeToMercatorAngle(latitude) -
@@ -343,6 +373,9 @@ function processBuffer(
   }
 
   positions.length = pointOffset;
+  if (hasCustomProjection) {
+    positions2D.length = pointOffset;
+  }
   uvs.length = pointOffset;
   heights.length = pointOffset;
   if (includeWebMercatorT) {
@@ -389,7 +422,9 @@ function processBuffer(
     westBorder,
     -percentage * rectangleWidth,
     true,
-    -percentage * rectangleHeight
+    -percentage * rectangleHeight,
+    positions2D,
+    mapProjection
   );
   addSkirt(
     positions,
@@ -400,7 +435,10 @@ function processBuffer(
     skirtOptions,
     southBorder,
     -percentage * rectangleHeight,
-    false
+    false,
+    0.0,
+    positions2D,
+    mapProjection
   );
   addSkirt(
     positions,
@@ -412,7 +450,9 @@ function processBuffer(
     eastBorder,
     percentage * rectangleWidth,
     true,
-    percentage * rectangleHeight
+    percentage * rectangleHeight,
+    positions2D,
+    mapProjection
   );
   addSkirt(
     positions,
@@ -423,7 +463,10 @@ function processBuffer(
     skirtOptions,
     northBorder,
     percentage * rectangleHeight,
-    false
+    false,
+    0.0,
+    positions2D,
+    mapProjection
   );
 
   // Since the corner between the north and west sides is in the west array, generate the last
@@ -471,21 +514,38 @@ function processBuffer(
     maxHeight,
     fromENU,
     false,
-    includeWebMercatorT
+    includeWebMercatorT,
+    relativeToCenter2D
   );
   var vertices = new Float32Array(size * encoding.getStride());
 
   var bufferIndex = 0;
-  for (var k = 0; k < size; ++k) {
-    bufferIndex = encoding.encode(
-      vertices,
-      bufferIndex,
-      positions[k],
-      uvs[k],
-      heights[k],
-      undefined,
-      webMercatorTs[k]
-    );
+  var k;
+  if (hasCustomProjection) {
+    for (k = 0; k < size; ++k) {
+      bufferIndex = encoding.encode(
+        vertices,
+        bufferIndex,
+        positions[k],
+        uvs[k],
+        heights[k],
+        undefined,
+        webMercatorTs[k],
+        positions2D[k]
+      );
+    }
+  } else {
+    for (k = 0; k < size; ++k) {
+      bufferIndex = encoding.encode(
+        vertices,
+        bufferIndex,
+        positions[k],
+        uvs[k],
+        heights[k],
+        undefined,
+        webMercatorTs[k]
+      );
+    }
   }
 
   var westIndicesSouthToNorth = westBorder
@@ -547,8 +607,12 @@ function addSkirt(
   borderPoints,
   fudgeFactor,
   eastOrWest,
-  cornerFudge
+  cornerFudge,
+  positions2D,
+  mapProjection
 ) {
+  var hasCustomProjection = !mapProjection.isNormalCylindrical;
+
   var count = borderPoints.length;
   for (var j = 0; j < count; ++j) {
     var borderPoint = borderPoints[j];
@@ -591,6 +655,14 @@ function addSkirt(
     uvs.push(Cartesian2.clone(uvs[borderIndex])); // Copy UVs from border point
     if (webMercatorTs.length > 0) {
       webMercatorTs.push(webMercatorTs[borderIndex]);
+    }
+
+    if (hasCustomProjection) {
+      var pos2D = mapProjection.project(
+        scratchCartographic,
+        projectedCartesian3Scratch
+      );
+      positions2D.push(new Cartesian2(pos2D.x, pos2D.y));
     }
 
     Matrix4.multiplyByPoint(skirtOptions.toENU, pos, scratchCartesian);

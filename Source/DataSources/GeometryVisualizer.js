@@ -240,25 +240,29 @@ function GeometryVisualizer(
     ClassificationType.NUMBER_OF_CLASSIFICATION_TYPES;
   var groundColorBatches = new Array(numberOfClassificationTypes);
   var groundMaterialBatches = [];
+  var mapProjection = scene.mapProjection;
   if (supportsMaterialsforEntitiesOnTerrain) {
     for (i = 0; i < numberOfClassificationTypes; ++i) {
       groundMaterialBatches.push(
         new StaticGroundGeometryPerMaterialBatch(
           groundPrimitives,
           i,
-          MaterialAppearance
+          MaterialAppearance,
+          mapProjection
         )
       );
       groundColorBatches[i] = new StaticGroundGeometryColorBatch(
         groundPrimitives,
-        i
+        i,
+        mapProjection
       );
     }
   } else {
     for (i = 0; i < numberOfClassificationTypes; ++i) {
       groundColorBatches[i] = new StaticGroundGeometryColorBatch(
         groundPrimitives,
-        i
+        i,
+        mapProjection
       );
     }
   }

@@ -746,7 +746,7 @@ GroundPolylinePrimitive.prototype.update = function (frameState) {
 
       // Update each geometry for framestate.scene3DOnly = true and projection
       geometryInstance.geometry._scene3DOnly = frameState.scene3DOnly;
-      GroundPolylineGeometry.setProjectionAndEllipsoid(
+      GroundPolylineGeometry.setProjection(
         geometryInstance.geometry,
         frameState.mapProjection
       );

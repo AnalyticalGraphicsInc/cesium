@@ -1593,7 +1593,7 @@ _This is an npm-only release to fix a publishing issue_.
 - Fixed bug where `GroundPrimitives` where rendering incorrectly or disappearing at different zoom levels. [#4161](https://github.com/CesiumGS/cesium/issues/4161), [#4326](https://github.com/CesiumGS/cesium/issues/4326)
 - `TerrainProvider` now optionally exposes an `availability` property that can be used to query the terrain level that is available at a location or in a rectangle. Currently only `CesiumTerrainProvider` exposes this property.
 - Added support for WMS version 1.3 by using CRS vice SRS query string parameter to request projection. SRS is still used for older versions.
-- Fixed a bug that caused all models to use the same highlight color. [#4798](https://github.com/CesiumGS/cesium/pull/4798)
+- Fixed a bug that caused all models to use the same highlight color. [#4798] (https://github.com/CesiumGS/cesium/pull/4798)
 - Fixed sky atmosphere from causing incorrect picking and hanging drill picking. [#4783](https://github.com/CesiumGS/cesium/issues/4783) and [#4784](https://github.com/CesiumGS/cesium/issues/4784)
 - Fixed KML loading when color is an empty string. [#4826](https://github.com/CesiumGS/cesium/pull/4826)
 - Fixed a bug that could cause a "readyImagery is not actually ready" exception when quickly zooming past the maximum available imagery level of an imagery layer near the poles.

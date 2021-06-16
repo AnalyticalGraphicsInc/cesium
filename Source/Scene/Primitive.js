@@ -1285,6 +1285,7 @@ function loadAsynchronous(primitive, frameState) {
         createGeometryTaskProcessors[i].scheduleTask(
           {
             subTasks: subTasks[i],
+            serializedMapProjection: frameState.serializedMapProjection,
           },
           subTaskTransferableObjects
         )
@@ -1308,21 +1309,20 @@ function loadAsynchronous(primitive, frameState) {
       : [primitive.geometryInstances];
 
     var scene3DOnly = frameState.scene3DOnly;
-    var projection = frameState.mapProjection;
 
     var promise = combineGeometryTaskProcessor.scheduleTask(
       PrimitivePipeline.packCombineGeometryParameters(
         {
           createGeometryResults: primitive._createGeometryResults,
           instances: instances,
-          ellipsoid: projection.ellipsoid,
-          projection: projection,
+          ellipsoid: frameState.mapProjection.ellipsoid,
           elementIndexUintSupported: frameState.context.elementIndexUint,
           scene3DOnly: scene3DOnly,
           vertexCacheOptimize: primitive.vertexCacheOptimize,
           compressVertices: primitive.compressVertices,
           modelMatrix: primitive.modelMatrix,
           createPickOffsets: primitive._createPickOffsets,
+          serializedMapProjection: frameState.serializedMapProjection,
         },
         transferableObjects
       ),

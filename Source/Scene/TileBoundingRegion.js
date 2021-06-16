@@ -4,6 +4,7 @@ import Cartographic from "../Core/Cartographic.js";
 import Check from "../Core/Check.js";
 import ColorGeometryInstanceAttribute from "../Core/ColorGeometryInstanceAttribute.js";
 import defaultValue from "../Core/defaultValue.js";
+import defined from "../Core/defined.js";
 import Ellipsoid from "../Core/Ellipsoid.js";
 import GeometryInstance from "../Core/GeometryInstance.js";
 import IntersectionTests from "../Core/IntersectionTests.js";
@@ -98,6 +99,9 @@ function TileBoundingRegion(options) {
    */
   this.northNormal = new Cartesian3();
 
+  this._projectedSouthWestCornerCartesian = undefined;
+  this._projectedNorthEastCornerCartesian = undefined;
+
   var ellipsoid = defaultValue(options.ellipsoid, Ellipsoid.WGS84);
   computeBox(this, options.rectangle, ellipsoid);
 
@@ -144,6 +148,31 @@ Object.defineProperties(TileBoundingRegion.prototype, {
     },
   },
 });
+
+function getProjectedCorners(
+  tile,
+  mapProjection,
+  southwestResult,
+  northeastResult
+) {
+  var projectedSouthwestCorner = tile._projectedSouthWestCornerCartesian;
+  var projectedNortheastCorner = tile._projectedNorthEastCornerCartesian;
+
+  if (!defined(projectedSouthwestCorner)) {
+    projectedSouthwestCorner = mapProjection.project(
+      Rectangle.southwest(tile.rectangle)
+    );
+    projectedNortheastCorner = mapProjection.project(
+      Rectangle.northeast(tile.rectangle)
+    );
+
+    tile._projectedSouthWestCornerCartesian = projectedSouthwestCorner;
+    tile._projectedNorthEastCornerCartesian = projectedNortheastCorner;
+  }
+
+  Cartesian3.clone(projectedSouthwestCorner, southwestResult);
+  Cartesian3.clone(projectedNortheastCorner, northeastResult);
+}
 
 var cartesian3Scratch = new Cartesian3();
 var cartesian3Scratch2 = new Cartesian3();
@@ -316,17 +345,18 @@ TileBoundingRegion.prototype.distanceToCamera = function (frameState) {
     var northNormal = this.northNormal;
 
     if (frameState.mode !== SceneMode.SCENE3D) {
-      southwestCornerCartesian = frameState.mapProjection.project(
-        Rectangle.southwest(this.rectangle),
-        southwestCornerScratch
+      southwestCornerCartesian = southwestCornerScratch;
+      northeastCornerCartesian = northeastCornerScratch;
+      getProjectedCorners(
+        this,
+        frameState.mapProjection,
+        southwestCornerCartesian,
+        northeastCornerCartesian
       );
+
       southwestCornerCartesian.z = southwestCornerCartesian.y;
       southwestCornerCartesian.y = southwestCornerCartesian.x;
       southwestCornerCartesian.x = 0.0;
-      northeastCornerCartesian = frameState.mapProjection.project(
-        Rectangle.northeast(this.rectangle),
-        northeastCornerScratch
-      );
       northeastCornerCartesian.z = northeastCornerCartesian.y;
       northeastCornerCartesian.y = northeastCornerCartesian.x;
       northeastCornerCartesian.x = 0.0;

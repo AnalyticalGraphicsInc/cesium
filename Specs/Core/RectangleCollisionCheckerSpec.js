@@ -1,3 +1,4 @@
+import { GeographicProjection } from "../../Source/Cesium.js";
 import { Rectangle } from "../../Source/Cesium.js";
 import { RectangleCollisionChecker } from "../../Source/Cesium.js";
 
@@ -7,7 +8,9 @@ describe("Core/RectangleCollisionChecker", function () {
   var testRectangle3 = new Rectangle(1.1, 1.1, 1.2, 1.2);
 
   it("Checks for collisions with contained rectangles", function () {
-    var collisionChecker = new RectangleCollisionChecker();
+    var collisionChecker = new RectangleCollisionChecker(
+      new GeographicProjection()
+    );
     collisionChecker.insert("test1", testRectangle1);
 
     expect(collisionChecker.collides(testRectangle2)).toBe(false);
@@ -17,7 +20,9 @@ describe("Core/RectangleCollisionChecker", function () {
   });
 
   it("removes rectangles", function () {
-    var collisionChecker = new RectangleCollisionChecker();
+    var collisionChecker = new RectangleCollisionChecker(
+      new GeographicProjection()
+    );
     collisionChecker.insert("test1", testRectangle1);
 
     collisionChecker.insert("test3", testRectangle3);

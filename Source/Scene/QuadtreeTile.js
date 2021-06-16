@@ -1,3 +1,5 @@
+import BoundingSphere from "../Core/BoundingSphere.js";
+import Cartesian3 from "../Core/Cartesian3.js";
 import defined from "../Core/defined.js";
 import DeveloperError from "../Core/DeveloperError.js";
 import Rectangle from "../Core/Rectangle.js";
@@ -73,6 +75,11 @@ function QuadtreeTile(options) {
   this._lastSelectionResult = TileSelectionResult.NONE;
   this._lastSelectionResultFrame = undefined;
   this._loadedCallbacks = {};
+
+  // For caching the result when MapProjections are expensive
+  this._boundingSphere2D = undefined;
+  this._southwestProjected = undefined;
+  this._northeastProjected = undefined;
 
   /**
    * Gets or sets the current state of the tile in the tile load pipeline.
@@ -403,6 +410,49 @@ Object.defineProperties(QuadtreeTile.prototype, {
     },
   },
 });
+
+QuadtreeTile.prototype.getBoundingSphere2D = function (
+  mapProjection,
+  minimumHeight,
+  maximumHeight
+) {
+  var boundingSphere2D = this._boundingSphere2D;
+  if (!defined(boundingSphere2D)) {
+    boundingSphere2D = BoundingSphere.fromRectangleWithHeights2D(
+      this.rectangle,
+      mapProjection,
+      minimumHeight,
+      maximumHeight
+    );
+    this._boundingSphere2D = boundingSphere2D;
+  }
+  return boundingSphere2D;
+};
+
+QuadtreeTile.prototype.getProjectedCorners = function (
+  mapProjection,
+  southwestResult,
+  northeastResult
+) {
+  var projectedSouthwestCorner = this._southwestProjected;
+  var projectedNortheastCorner = this._northeastProjected;
+
+  if (!defined(projectedSouthwestCorner)) {
+    var rectangle = this.rectangle;
+    projectedSouthwestCorner = mapProjection.project(
+      Rectangle.southwest(rectangle)
+    );
+    projectedNortheastCorner = mapProjection.project(
+      Rectangle.northeast(rectangle)
+    );
+
+    this._southwestProjected = projectedSouthwestCorner;
+    this._northeastProjected = projectedNortheastCorner;
+  }
+
+  Cartesian3.clone(projectedSouthwestCorner, southwestResult);
+  Cartesian3.clone(projectedNortheastCorner, northeastResult);
+};
 
 QuadtreeTile.prototype.findLevelZeroTile = function (levelZeroTiles, x, y) {
   var xTiles = this.tilingScheme.getNumberOfXTilesAtLevel(0);

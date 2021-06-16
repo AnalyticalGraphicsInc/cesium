@@ -4,7 +4,10 @@ import defaultValue from "./defaultValue.js";
 import defined from "./defined.js";
 import DeveloperError from "./DeveloperError.js";
 import Ellipsoid from "./Ellipsoid.js";
+import MapProjectionType from "./MapProjectionType.js";
 import CesiumMath from "./Math.js";
+import SerializedMapProjection from "./SerializedMapProjection.js";
+import when from "../ThirdParty/when.js";
 
 /**
  * The map projection used by Google Maps, Bing Maps, and most of ArcGIS Online, EPSG:3857.  This
@@ -38,7 +41,48 @@ Object.defineProperties(WebMercatorProjection.prototype, {
       return this._ellipsoid;
     },
   },
+  /**
+   * Gets whether or not the projection evenly maps meridians to vertical lines.
+   * The Web Mercator projection is cylindrical about the equator.
+   *
+   * @memberof WebMercatorProjection.prototype
+   *
+   * @type {Boolean}
+   * @readonly
+   * @private
+   */
+  isNormalCylindrical: {
+    get: function () {
+      return true;
+    },
+  },
 });
+
+/**
+ * Returns a JSON object that can be messaged to a web worker.
+ *
+ * @private
+ * @returns {SerializedMapProjection} A JSON object from which the MapProjection can be rebuilt.
+ */
+WebMercatorProjection.prototype.serialize = function () {
+  return new SerializedMapProjection(
+    MapProjectionType.WEBMERCATOR,
+    Ellipsoid.pack(this.ellipsoid, [])
+  );
+};
+
+/**
+ * Reconstructs a <code>WebMercatorProjection</object> object from the input JSON.
+ *
+ * @private
+ * @param {SerializedMapProjection} serializedMapProjection A JSON object from which the MapProjection can be rebuilt.
+ * @returns {Promise.<WebMercatorProjection>} A Promise that resolves to a MapProjection that is ready for use, or rejects if the SerializedMapProjection is malformed.
+ */
+WebMercatorProjection.deserialize = function (serializedMapProjection) {
+  return when.resolve(
+    new WebMercatorProjection(Ellipsoid.unpack(serializedMapProjection.json))
+  );
+};
 
 /**
  * Converts a Mercator angle, in the range -PI to PI, to a geodetic latitude

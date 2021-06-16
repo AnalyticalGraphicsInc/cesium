@@ -20,6 +20,8 @@ function createFrameState(context, camera, frameNumber, time) {
 
   var projection = new GeographicProjection();
   frameState.mapProjection = projection;
+  frameState.serializedMapProjection = projection.serialize();
+
   frameState.frameNumber = defaultValue(frameNumber, 1.0);
   frameState.time = defaultValue(
     time,

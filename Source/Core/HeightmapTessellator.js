@@ -2,9 +2,10 @@ import AxisAlignedBoundingBox from "./AxisAlignedBoundingBox.js";
 import BoundingSphere from "./BoundingSphere.js";
 import Cartesian2 from "./Cartesian2.js";
 import Cartesian3 from "./Cartesian3.js";
+import Cartographic from "./Cartographic.js";
+import Check from "./Check.js";
 import defaultValue from "./defaultValue.js";
 import defined from "./defined.js";
-import DeveloperError from "./DeveloperError.js";
 import Ellipsoid from "./Ellipsoid.js";
 import EllipsoidalOccluder from "./EllipsoidalOccluder.js";
 import CesiumMath from "./Math.js";
@@ -42,6 +43,10 @@ var cartesian3Scratch = new Cartesian3();
 var matrix4Scratch = new Matrix4();
 var minimumScratch = new Cartesian3();
 var maximumScratch = new Cartesian3();
+
+var cartographicScratch = new Cartographic();
+var relativeToCenter2dScratch = new Cartesian3();
+var projectedCartesian3Scratch = new Cartesian3();
 
 /**
  * Fills an array of vertices from a heightmap image.
@@ -92,7 +97,8 @@ var maximumScratch = new Cartesian3();
  * @param {Boolean} [options.structure.isBigEndian=false] Indicates endianness of the elements in the buffer when the
  *                  stride property is greater than 1.  If this property is false, the first element is the
  *                  low-order element.  If it is true, the first element is the high-order element.
- *
+ * @param {Boolean} [options.includeWebMercatorT=false] Indicates that the vertices should include a T coordinate to compensate for Web Mercator Latitude.
+ * @param {MapProjection} mapProjection MapProjection for projecting terrain positions to the target 2D coordinate system.
  * @example
  * var width = 5;
  * var height = 5;
@@ -112,26 +118,23 @@ var maximumScratch = new Cartesian3();
  * var encoding = statistics.encoding;
  * var position = encoding.decodePosition(statistics.vertices, index * encoding.getStride());
  */
-HeightmapTessellator.computeVertices = function (options) {
+HeightmapTessellator.computeVertices = function (options, mapProjection) {
   //>>includeStart('debug', pragmas.debug);
-  if (!defined(options) || !defined(options.heightmap)) {
-    throw new DeveloperError("options.heightmap is required.");
-  }
-  if (!defined(options.width) || !defined(options.height)) {
-    throw new DeveloperError("options.width and options.height are required.");
-  }
-  if (!defined(options.nativeRectangle)) {
-    throw new DeveloperError("options.nativeRectangle is required.");
-  }
-  if (!defined(options.skirtHeight)) {
-    throw new DeveloperError("options.skirtHeight is required.");
-  }
+  Check.defined("options", options);
+  Check.defined("options.heightmap", options.heightmap);
+  Check.typeOf.number("options.width", options.width);
+  Check.typeOf.number("options.height", options.height);
+  Check.defined("options.nativeRectangle", options.nativeRectangle);
+  Check.typeOf.number("options.skirtHeight", options.skirtHeight);
+  Check.defined("mapProjection", mapProjection);
   //>>includeEnd('debug');
 
   // This function tends to be a performance hotspot for terrain rendering,
   // so it employs a lot of inlining and unrolling as an optimization.
   // In particular, the functionality of Ellipsoid.cartographicToCartesian
   // is inlined.
+
+  var nonEquatorialCylindricalProjection = !mapProjection.isNormalCylindrical;
 
   var cos = Math.cos;
   var sin = Math.sin;
@@ -187,6 +190,29 @@ HeightmapTessellator.computeVertices = function (options) {
   relativeToCenter = hasRelativeToCenter ? relativeToCenter : Cartesian3.ZERO;
   var exaggeration = defaultValue(options.exaggeration, 1.0);
   var includeWebMercatorT = defaultValue(options.includeWebMercatorT, false);
+
+  var relativeToCenter2D;
+  if (nonEquatorialCylindricalProjection) {
+    if (hasRelativeToCenter) {
+      var cartographicRTC = ellipsoid.cartesianToCartographic(
+        relativeToCenter,
+        cartographicScratch
+      );
+      var projectedRTC = mapProjection.project(
+        cartographicRTC,
+        projectedCartesian3Scratch
+      );
+      relativeToCenter2D = Cartesian3.clone(
+        projectedRTC,
+        relativeToCenter2dScratch
+      );
+    } else {
+      relativeToCenter2D = Cartesian3.clone(
+        Cartesian3.ZERO,
+        relativeToCenter2dScratch
+      );
+    }
+  }
 
   var structure = defaultValue(
     options.structure,
@@ -270,6 +296,11 @@ HeightmapTessellator.computeVertices = function (options) {
   var positions = new Array(vertexCount);
   var heights = new Array(vertexCount);
   var uvs = new Array(vertexCount);
+  var positions2D;
+  if (nonEquatorialCylindricalProjection) {
+    positions2D = new Array(vertexCount);
+  }
+
   var webMercatorTs = includeWebMercatorT ? new Array(vertexCount) : [];
 
   var startRow = 0;
@@ -440,6 +471,14 @@ HeightmapTessellator.computeVertices = function (options) {
       heights[index] = heightSample;
       uvs[index] = new Cartesian2(u, v);
 
+      if (nonEquatorialCylindricalProjection) {
+        var cartographic = cartographicScratch;
+        cartographic.height = heightSample;
+        cartographic.longitude = longitude;
+        cartographic.latitude = latitude;
+        positions2D[index] = mapProjection.project(cartographic);
+      }
+
       if (includeWebMercatorT) {
         webMercatorTs[index] = webMercatorT;
       }
@@ -480,21 +519,38 @@ HeightmapTessellator.computeVertices = function (options) {
     maximumHeight,
     fromENU,
     false,
-    includeWebMercatorT
+    includeWebMercatorT,
+    relativeToCenter2D
   );
   var vertices = new Float32Array(vertexCount * encoding.getStride());
 
   var bufferIndex = 0;
-  for (var j = 0; j < vertexCount; ++j) {
-    bufferIndex = encoding.encode(
-      vertices,
-      bufferIndex,
-      positions[j],
-      uvs[j],
-      heights[j],
-      undefined,
-      webMercatorTs[j]
-    );
+  var j;
+  if (nonEquatorialCylindricalProjection) {
+    for (j = 0; j < vertexCount; ++j) {
+      bufferIndex = encoding.encode(
+        vertices,
+        bufferIndex,
+        positions[j],
+        uvs[j],
+        heights[j],
+        undefined,
+        webMercatorTs[j],
+        positions2D[j]
+      );
+    }
+  } else {
+    for (j = 0; j < vertexCount; ++j) {
+      bufferIndex = encoding.encode(
+        vertices,
+        bufferIndex,
+        positions[j],
+        uvs[j],
+        heights[j],
+        undefined,
+        webMercatorTs[j]
+      );
+    }
   }
 
   return {

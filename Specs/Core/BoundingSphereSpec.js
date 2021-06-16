@@ -10,6 +10,7 @@ import { Math as CesiumMath } from "../../Source/Cesium.js";
 import { Matrix4 } from "../../Source/Cesium.js";
 import { OrientedBoundingBox } from "../../Source/Cesium.js";
 import { Plane } from "../../Source/Cesium.js";
+import { Proj4Projection } from "../../Source/Cesium.js";
 import { Rectangle } from "../../Source/Cesium.js";
 import createPackableSpecs from "../createPackableSpecs.js";
 
@@ -965,18 +966,13 @@ describe("Core/BoundingSphere", function () {
     expect(distanceFromCenter).toBeLessThanOrEqualTo(boundingSphere.radius);
   }
 
-  it("fromRectangleWithHeights2D includes specified min and max heights", function () {
-    var rectangle = new Rectangle(0.1, 0.5, 0.2, 0.6);
-    var projection = new GeographicProjection();
-    var minHeight = -327.0;
-    var maxHeight = 2456.0;
-    var boundingSphere = BoundingSphere.fromRectangleWithHeights2D(
-      rectangle,
-      projection,
-      minHeight,
-      maxHeight
-    );
-
+  function checkPerimeterAndCenter(
+    rectangle,
+    boundingSphere,
+    projection,
+    minHeight,
+    maxHeight
+  ) {
     // Test that the corners are inside the bounding sphere.
     var point = Rectangle.southwest(rectangle).clone();
     point.height = minHeight;
@@ -1075,6 +1071,51 @@ describe("Core/BoundingSphere", function () {
       maxHeight
     );
     expectBoundingSphereToContainPoint(boundingSphere, point, projection);
+  }
+
+  it("fromRectangleWithHeights2D includes specified min and max heights", function () {
+    var rectangle = new Rectangle(0.1, 0.5, 0.2, 0.6);
+    var projection = new GeographicProjection();
+    var minHeight = -327.0;
+    var maxHeight = 2456.0;
+    var boundingSphere = BoundingSphere.fromRectangleWithHeights2D(
+      rectangle,
+      projection,
+      minHeight,
+      maxHeight
+    );
+
+    checkPerimeterAndCenter(
+      rectangle,
+      boundingSphere,
+      projection,
+      minHeight,
+      maxHeight
+    );
+  });
+
+  it("fromRectangleWithHeights2D includes specified min and max heights when using non cylindrical, non-equatorial projections", function () {
+    var rectangle = Rectangle.MAX_VALUE;
+    var projection = new Proj4Projection({
+      wellKnownText:
+        "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +a=6371000 +b=6371000 +units=m +no_defs",
+    });
+    var minHeight = -327.0;
+    var maxHeight = 2456.0;
+    var boundingSphere = BoundingSphere.fromRectangleWithHeights2D(
+      rectangle,
+      projection,
+      minHeight,
+      maxHeight
+    );
+
+    checkPerimeterAndCenter(
+      rectangle,
+      boundingSphere,
+      projection,
+      minHeight,
+      maxHeight
+    );
   });
 
   it("computes the volume of a BoundingSphere", function () {

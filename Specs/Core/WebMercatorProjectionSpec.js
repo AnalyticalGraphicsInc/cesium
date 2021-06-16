@@ -202,4 +202,17 @@ describe("Core/WebMercatorProjection", function () {
       return projection.unproject();
     }).toThrowDeveloperError();
   });
+
+  it("serializes and deserializes", function () {
+    var projection = new WebMercatorProjection(Ellipsoid.UNIT_SPHERE);
+    var serialized = projection.serialize();
+
+    return WebMercatorProjection.deserialize(serialized).then(function (
+      deserializedProjection
+    ) {
+      expect(
+        projection.ellipsoid.equals(deserializedProjection.ellipsoid)
+      ).toBe(true);
+    });
+  });
 });
