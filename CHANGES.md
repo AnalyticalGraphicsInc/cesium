@@ -16,6 +16,7 @@
 - Fixed error handling in `GlobeSurfaceTile` to print terrain tile request errors to console. [#9570](https://github.com/CesiumGS/cesium/pull/9570)
 - Fixed broken image URL in the KML Sandcastle. [#9579](https://github.com/CesiumGS/cesium/pull/9579)
 - Fixed an error where the `positionToEyeEC` and `tangentToEyeMatrix` properties for custom materials were not set in `GlobeFS`. [#9597](https://github.com/CesiumGS/cesium/pull/9597)
+- Fixed the Sandcastles webpage so that the default sandcastle is "3D Tiles Interactivity" and the default tab is "3D Tiles" instead of "Showcases." [#7462](https://github.com/CesiumGS/cesium/issues/7462)
 
 ### 1.82.1 - 2021-06-01
 
