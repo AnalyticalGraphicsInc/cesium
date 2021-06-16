@@ -1,4 +1,7 @@
 import defaultValue from "./defaultValue.js";
+import defined from "./defined.js";
+import SceneMode from "../Scene/SceneMode.js";
+import TriangleSearchIntersectionTester from "./TriangleSearchIntersectionTester.js";
 
 /**
  * A mesh plus related metadata for a single tile of terrain.  Instances of this type are
@@ -29,6 +32,7 @@ import defaultValue from "./defaultValue.js";
  * @param {Number[]} southIndicesEastToWest The indices of the vertices on the Southern edge of the tile, ordered from East to West (clockwise).
  * @param {Number[]} eastIndicesNorthToSouth The indices of the vertices on the Eastern edge of the tile, ordered from North to South (clockwise).
  * @param {Number[]} northIndicesWestToEast The indices of the vertices on the Northern edge of the tile, ordered from West to East (clockwise).
+ * @param {TrianglePicking} trianglePicking The triangle picking instance to use.
  *
  * @private
  */
@@ -49,7 +53,8 @@ function TerrainMesh(
   westIndicesSouthToNorth,
   southIndicesEastToWest,
   eastIndicesNorthToSouth,
-  northIndicesWestToEast
+  northIndicesWestToEast,
+  trianglePicking
 ) {
   /**
    * The center of the tile.  Vertex positions are specified relative to this center.
@@ -160,5 +165,94 @@ function TerrainMesh(
    * @type {Number[]}
    */
   this.northIndicesWestToEast = northIndicesWestToEast;
+
+  /**
+   * Used when calling {@link TerrainMesh#getPickRay}
+   * @type {TrianglePicking}
+   * @private
+   */
+  this._trianglePicking = trianglePicking;
+
+  this._defaultPickStrategy = new TriangleSearchIntersectionTester(
+    encoding,
+    indices,
+    vertices
+  );
+  if (!this._trianglePicking) {
+    this._trianglePicking = this._defaultPickStrategy;
+  }
 }
+
+function isCartesianAlmostEqual(a, b) {
+  if (!a || !b) {
+    return !a === !b;
+  }
+  return (
+    Math.abs(a.x - b.x) < 0.1 &&
+    Math.abs(a.y - b.y) < 0.1 &&
+    Math.abs(a.z - b.z) < 0.1
+  );
+}
+
+/**
+ * Gives the point on the mesh where the give ray intersects
+ * @param ray
+ * @param cullBackFaces
+ * @param mode
+ * @param projection
+ * @returns {Cartesian3}
+ */
+TerrainMesh.prototype.pickRay = function (
+  ray,
+  cullBackFaces,
+  mode,
+  projection
+) {
+  var trace = window.showPickDetails;
+
+  var traceDetails;
+  if (trace) {
+    traceDetails = {};
+  }
+
+  var canNewPick = mode === SceneMode.SCENE3D && defined(this._trianglePicking);
+  var newPickValue;
+  if (canNewPick) {
+    // console.time("new pick");
+    newPickValue = this._trianglePicking.rayIntersect(
+      ray,
+      cullBackFaces,
+      null,
+      traceDetails
+    );
+    // console.timeEnd("new pick");
+  }
+
+  var oldPickValue = this._defaultPickStrategy.rayIntersect(
+    ray,
+    cullBackFaces,
+    mode,
+    projection,
+    traceDetails
+  );
+
+  // whoops
+  if (canNewPick && !isCartesianAlmostEqual(newPickValue, oldPickValue)) {
+    console.error("pick values are different", newPickValue, oldPickValue);
+  }
+
+  // record details on the window
+  if (trace) {
+    window.lastPickDetails = {
+      ray: ray,
+      newPickValue: newPickValue,
+      oldPickValue: oldPickValue,
+      mesh: this,
+      traceDetails: traceDetails,
+    };
+  }
+
+  return newPickValue || oldPickValue;
+};
+
 export default TerrainMesh;

@@ -16,6 +16,7 @@ import TerrainData from "./TerrainData.js";
 import TerrainEncoding from "./TerrainEncoding.js";
 import TerrainMesh from "./TerrainMesh.js";
 import TerrainProvider from "./TerrainProvider.js";
+import QuadtreeTrianglePicker from "./QuadtreeTrianglePicker.js";
 
 /**
  * Terrain data for a single tile where the terrain data is represented as a heightmap.  A heightmap
@@ -283,11 +284,19 @@ HeightmapTerrainData.prototype.createMesh = function (options) {
 
     var vertexCountWithoutSkirts = result.gridWidth * result.gridHeight;
 
-    // Clone complex result objects because the transfer from the web worker
-    // has stripped them down to JSON-style objects.
+    var encoding = TerrainEncoding.clone(result.encoding);
+    var vertices = new Float32Array(result.vertices);
+
+    var quadtreeTrianglePicker = new QuadtreeTrianglePicker(
+      result.packedQuadtree,
+      encoding,
+      vertices,
+      indicesAndEdges.indices
+    );
+
     that._mesh = new TerrainMesh(
       center,
-      new Float32Array(result.vertices),
+      vertices,
       indicesAndEdges.indices,
       indicesAndEdges.indexCountWithoutSkirts,
       vertexCountWithoutSkirts,
@@ -297,12 +306,13 @@ HeightmapTerrainData.prototype.createMesh = function (options) {
       Cartesian3.clone(result.occludeePointInScaledSpace),
       result.numberOfAttributes,
       OrientedBoundingBox.clone(result.orientedBoundingBox),
-      TerrainEncoding.clone(result.encoding),
+      encoding,
       exaggeration,
       indicesAndEdges.westIndicesSouthToNorth,
       indicesAndEdges.southIndicesEastToWest,
       indicesAndEdges.eastIndicesNorthToSouth,
-      indicesAndEdges.northIndicesWestToEast
+      indicesAndEdges.northIndicesWestToEast,
+      quadtreeTrianglePicker
     );
 
     // Free memory received from server after mesh is created.

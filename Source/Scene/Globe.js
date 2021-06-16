@@ -750,9 +750,10 @@ function tileIfContainsCartographic(tile, cartographic) {
  * Get the height of the surface at a given cartographic.
  *
  * @param {Cartographic} cartographic The cartographic for which to find the height.
+ * @param {SceneMode} mode the SceneMode in use
  * @returns {Number|undefined} The height of the cartographic or undefined if it could not be found.
  */
-Globe.prototype.getHeight = function (cartographic) {
+Globe.prototype.getHeight = function (cartographic, mode) {
   //>>includeStart('debug', pragmas.debug);
   if (!defined(cartographic)) {
     throw new DeveloperError("cartographic is required");
@@ -856,7 +857,7 @@ Globe.prototype.getHeight = function (cartographic) {
 
   var intersection = tile.data.pick(
     ray,
-    undefined,
+    mode,
     undefined,
     false,
     scratchGetHeightIntersection

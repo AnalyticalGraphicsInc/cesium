@@ -3,10 +3,8 @@ import Cartesian3 from "../Core/Cartesian3.js";
 import Cartesian4 from "../Core/Cartesian4.js";
 import defined from "../Core/defined.js";
 import IndexDatatype from "../Core/IndexDatatype.js";
-import IntersectionTests from "../Core/IntersectionTests.js";
 import OrientedBoundingBox from "../Core/OrientedBoundingBox.js";
 import PixelFormat from "../Core/PixelFormat.js";
-import Ray from "../Core/Ray.js";
 import Request from "../Core/Request.js";
 import RequestState from "../Core/RequestState.js";
 import RequestType from "../Core/RequestType.js";
@@ -23,7 +21,6 @@ import VertexArray from "../Renderer/VertexArray.js";
 import when from "../ThirdParty/when.js";
 import ImageryState from "./ImageryState.js";
 import QuadtreeTileLoadState from "./QuadtreeTileLoadState.js";
-import SceneMode from "./SceneMode.js";
 import TerrainState from "./TerrainState.js";
 
 /**
@@ -127,23 +124,6 @@ Object.defineProperties(GlobeSurfaceTile.prototype, {
   },
 });
 
-function getPosition(encoding, mode, projection, vertices, index, result) {
-  encoding.decodePosition(vertices, index, result);
-
-  if (defined(mode) && mode !== SceneMode.SCENE3D) {
-    var ellipsoid = projection.ellipsoid;
-    var positionCart = ellipsoid.cartesianToCartographic(result);
-    projection.project(positionCart, result);
-    Cartesian3.fromElements(result.z, result.x, result.y, result);
-  }
-
-  return result;
-}
-
-var scratchV0 = new Cartesian3();
-var scratchV1 = new Cartesian3();
-var scratchV2 = new Cartesian3();
-
 GlobeSurfaceTile.prototype.pick = function (
   ray,
   mode,
@@ -151,42 +131,11 @@ GlobeSurfaceTile.prototype.pick = function (
   cullBackFaces,
   result
 ) {
-  var mesh = this.renderedMesh;
-  if (!defined(mesh)) {
+  if (!defined(this.renderedMesh)) {
     return undefined;
   }
-
-  var vertices = mesh.vertices;
-  var indices = mesh.indices;
-  var encoding = mesh.encoding;
-  var indicesLength = indices.length;
-
-  var minT = Number.MAX_VALUE;
-
-  for (var i = 0; i < indicesLength; i += 3) {
-    var i0 = indices[i];
-    var i1 = indices[i + 1];
-    var i2 = indices[i + 2];
-
-    var v0 = getPosition(encoding, mode, projection, vertices, i0, scratchV0);
-    var v1 = getPosition(encoding, mode, projection, vertices, i1, scratchV1);
-    var v2 = getPosition(encoding, mode, projection, vertices, i2, scratchV2);
-
-    var t = IntersectionTests.rayTriangleParametric(
-      ray,
-      v0,
-      v1,
-      v2,
-      cullBackFaces
-    );
-    if (defined(t) && t < minT && t >= 0.0) {
-      minT = t;
-    }
-  }
-
-  return minT !== Number.MAX_VALUE
-    ? Ray.getPoint(ray, minT, result)
-    : undefined;
+  var value = this.renderedMesh.pickRay(ray, cullBackFaces, mode, projection);
+  return Cartesian3.clone(value, result);
 };
 
 GlobeSurfaceTile.prototype.freeResources = function () {

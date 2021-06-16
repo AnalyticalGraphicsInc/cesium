@@ -2,10 +2,12 @@ import { ArcGISTiledElevationTerrainProvider } from "../../Source/Cesium.js";
 import { Cartographic } from "../../Source/Cesium.js";
 import { CesiumTerrainProvider } from "../../Source/Cesium.js";
 import { createWorldTerrain } from "../../Source/Cesium.js";
-import { defined } from "../../Source/Cesium.js";
-import { RequestScheduler } from "../../Source/Cesium.js";
-import { Resource } from "../../Source/Cesium.js";
 import { sampleTerrain } from "../../Source/Cesium.js";
+import {
+  patchXHRLoad,
+  patchXHRLoadForArcGISTerrainDataSet,
+  resetXHRPatch,
+} from "../patchXHRLoad.js";
 
 describe("Core/sampleTerrain", function () {
   var worldTerrain;
@@ -105,13 +107,8 @@ describe("Core/sampleTerrain", function () {
   });
 
   describe("with terrain providers", function () {
-    beforeEach(function () {
-      RequestScheduler.clearForSpecs();
-    });
-
     afterEach(function () {
-      Resource._Implementations.loadWithXhr =
-        Resource._DefaultImplementations.loadWithXhr;
+      resetXHRPatch();
     });
 
     function spyOnTerrainDataCreateMesh(terrainProvider) {
@@ -158,55 +155,6 @@ describe("Core/sampleTerrain", function () {
       );
     }
 
-    function endsWith(value, suffix) {
-      return value.indexOf(suffix, value.length - suffix.length) >= 0;
-    }
-
-    function patchXHRLoad(proxySpec) {
-      Resource._Implementations.loadWithXhr = function (
-        url,
-        responseType,
-        method,
-        data,
-        headers,
-        deferred,
-        overrideMimeType
-      ) {
-        // find a key (source path) path in the spec which matches (ends with) the requested url
-        var availablePaths = Object.keys(proxySpec);
-        var proxiedUrl;
-
-        for (var i = 0; i < availablePaths.length; i++) {
-          var srcPath = availablePaths[i];
-          if (endsWith(url, srcPath)) {
-            proxiedUrl = proxySpec[availablePaths[i]];
-            break;
-          }
-        }
-
-        // it's a whitelist - meaning you have to proxy every request explicitly
-        if (!defined(proxiedUrl)) {
-          throw new Error(
-            "Unexpected XHR load to url: " +
-              url +
-              "; spec includes: " +
-              availablePaths.join(", ")
-          );
-        }
-
-        // make a real request to the proxied path for the matching source path
-        return Resource._DefaultImplementations.loadWithXhr(
-          proxiedUrl,
-          responseType,
-          method,
-          data,
-          headers,
-          deferred,
-          overrideMimeType
-        );
-      };
-    }
-
     it("should work for Cesium World Terrain", function () {
       patchXHRLoad({
         "/layer.json": "Data/CesiumTerrainTileJson/9_759_335/layer.json",
@@ -249,12 +197,7 @@ describe("Core/sampleTerrain", function () {
     });
 
     it("should work for ArcGIS terrain", function () {
-      patchXHRLoad({
-        "/?f=pjson": "Data/ArcGIS/9_214_379/root.json",
-        "/tilemap/10/384/640/128/128":
-          "Data/ArcGIS/9_214_379/tilemap_10_384_640_128_128.json",
-        "/tile/9/214/379": "Data/ArcGIS/9_214_379/tile_9_214_379.tile",
-      });
+      patchXHRLoadForArcGISTerrainDataSet();
 
       var terrainProvider = new ArcGISTiledElevationTerrainProvider({
         url: "made/up/url",

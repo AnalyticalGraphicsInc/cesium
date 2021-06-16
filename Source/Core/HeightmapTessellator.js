@@ -43,6 +43,104 @@ var matrix4Scratch = new Matrix4();
 var minimumScratch = new Cartesian3();
 var maximumScratch = new Cartesian3();
 
+function Point(x, y) {
+  this.x = x;
+  this.y = y;
+}
+
+function QuadtreeNode(level, topLeft, bottomRight) {
+  this.level = level;
+  // details about this node
+  this.topLeft = topLeft;
+  this.bottomRight = bottomRight;
+  this.maxHeight = -1; // sufficiently lower than what should be the minimum height of about -0.5
+  this.minHeight = 1; // sufficiently higher than what should be the maximum height of about 0.5
+
+  if (level < 5) {
+    this.topLeftTree = new QuadtreeNode(
+      level + 1,
+      new Point(topLeft.x, topLeft.y),
+      new Point(
+        (topLeft.x + bottomRight.x) / 2,
+        (topLeft.y + bottomRight.y) / 2
+      )
+    );
+    this.bottomLeftTree = new QuadtreeNode(
+      level + 1,
+      new Point(topLeft.x, (topLeft.y + bottomRight.y) / 2),
+      new Point((topLeft.x + bottomRight.x) / 2, bottomRight.y)
+    );
+
+    this.topRightTree = new QuadtreeNode(
+      level + 1,
+      new Point((topLeft.x + bottomRight.x) / 2, topLeft.y),
+      new Point(bottomRight.x, (topLeft.y + bottomRight.y) / 2)
+    );
+    this.bottomRightTree = new QuadtreeNode(
+      level + 1,
+      new Point(
+        (topLeft.x + bottomRight.x) / 2,
+        (topLeft.y + bottomRight.y) / 2
+      ),
+      new Point(bottomRight.x, bottomRight.y)
+    );
+  }
+}
+
+function createPackedQuadtree(
+  positions,
+  invTransform,
+  width,
+  triangleIndexEnd
+) {
+  var axisAlignedPositions = [];
+  var i;
+  for (i = 0; i < positions.length; i++) {
+    var position = positions[i];
+    var v0 = new Cartesian3();
+    Matrix4.multiplyByPoint(invTransform, position, v0);
+    axisAlignedPositions.push(v0);
+  }
+
+  var rootNode = new QuadtreeNode(
+    0,
+    new Point(-0.5, -0.5),
+    new Point(0.5, 0.5)
+  );
+
+  for (i = 0; i < axisAlignedPositions.length; i++) {
+    var pos = axisAlignedPositions[i];
+    var node = rootNode;
+    while (node) {
+      var topLeft = node.topLeft;
+      var botRight = node.bottomRight;
+
+      node.maxHeight = Math.max(pos.z, node.maxHeight);
+      node.minHeight = Math.min(pos.z, node.minHeight);
+
+      if ((topLeft.x + botRight.x) / 2 >= pos.x) {
+        if ((topLeft.y + botRight.y) / 2 >= pos.y) {
+          // Indicates topLeftTree
+          node = node.topLeftTree;
+        } else {
+          // Indicates botLeftTree
+          node = node.bottomLeftTree;
+        }
+      } else {
+        if ((topLeft.y + botRight.y) / 2 >= pos.y) {
+          // Indicates topRightTree
+          node = node.topRightTree;
+        } else {
+          // Indicates botRightTree
+          node = node.bottomRightTree;
+        }
+      }
+    }
+  }
+
+  return rootNode;
+}
+
 /**
  * Fills an array of vertices from a heightmap image.
  *
@@ -132,6 +230,8 @@ HeightmapTessellator.computeVertices = function (options) {
   // so it employs a lot of inlining and unrolling as an optimization.
   // In particular, the functionality of Ellipsoid.cartographicToCartesian
   // is inlined.
+
+  console.time("setup stuff");
 
   var cos = Math.cos;
   var sin = Math.sin;
@@ -264,6 +364,7 @@ HeightmapTessellator.computeVertices = function (options) {
   var hMin = Number.POSITIVE_INFINITY;
 
   var gridVertexCount = width * height;
+  var gridTriangleCount = (width - 1) * (height - 1) * 2;
   var edgeVertexCount = skirtHeight > 0.0 ? width * 2 + height * 2 : 0;
   var vertexCount = gridVertexCount + edgeVertexCount;
 
@@ -452,27 +553,82 @@ HeightmapTessellator.computeVertices = function (options) {
     }
   }
 
+  console.timeEnd("setup stuff");
+  console.time("creating bounding sphere");
+
   var boundingSphere3D = BoundingSphere.fromPoints(positions);
+
+  console.timeEnd("creating bounding sphere");
+
   var orientedBoundingBox;
+  var quadtree;
+  var transform;
+  var inverseTransform;
+
   if (defined(rectangle)) {
+    console.time("creating oriented bounding box");
+
     orientedBoundingBox = OrientedBoundingBox.fromRectangle(
       rectangle,
       minimumHeight,
       maximumHeight,
       ellipsoid
     );
+
+    transform = OrientedBoundingBox.toTransformation(orientedBoundingBox);
+    var a = CesiumMath.toRadians(180);
+    // prettier-ignore
+    var xRotation = new Matrix4(
+      1,        0,       0,    0,
+      0,   cos(a),  -sin(a),    0,
+      0,  sin(a),  cos(a),    0,
+      0,        0,       0,    1
+    );
+    // prettier-ignore
+    var yRotation = new Matrix4(
+      cos(a),   0,  sin(a),  0,
+      0,        1,        0,  0,
+      -sin(a),  0,  cos(a),   0,
+      0,        0,        0,  1
+    );
+    // prettier-ignore
+    var zRotation = new Matrix4(
+      cos(a),  -sin(a),   0,  0,
+      sin(a),   cos(a),   0,  0,
+      0,             0,   1,  0,
+      0,             0,   0,  1
+    );
+    Matrix4.multiply(transform, xRotation, transform);
+    // Matrix4.multiply(transform, yRotation, transform);
+    // Matrix4.multiply(transform, zRotation, transform);
+
+    inverseTransform = Matrix4.inverse(transform, new Matrix4());
+
+    console.timeEnd("creating oriented bounding box");
+
+    console.time("making packed quadtree");
+    quadtree = createPackedQuadtree(
+      positions,
+      inverseTransform,
+      width,
+      gridTriangleCount
+    );
+    console.timeEnd("making packed quadtree");
   }
 
   var occludeePointInScaledSpace;
   if (hasRelativeToCenter) {
+    console.time("creating occluder");
     var occluder = new EllipsoidalOccluder(ellipsoid);
     occludeePointInScaledSpace = occluder.computeHorizonCullingPointPossiblyUnderEllipsoid(
       relativeToCenter,
       positions,
       minimumHeight
     );
+    console.timeEnd("creating occluder");
   }
 
+  console.time("terrain encoding");
   var aaBox = new AxisAlignedBoundingBox(minimum, maximum, relativeToCenter);
   var encoding = new TerrainEncoding(
     aaBox,
@@ -497,6 +653,8 @@ HeightmapTessellator.computeVertices = function (options) {
     );
   }
 
+  console.timeEnd("terrain encoding");
+
   return {
     vertices: vertices,
     maximumHeight: maximumHeight,
@@ -505,6 +663,17 @@ HeightmapTessellator.computeVertices = function (options) {
     boundingSphere3D: boundingSphere3D,
     orientedBoundingBox: orientedBoundingBox,
     occludeePointInScaledSpace: occludeePointInScaledSpace,
+    packedQuadtree: {
+      orientedBoundingBox: orientedBoundingBox,
+      boundingSphere3D: boundingSphere3D,
+      inverseTransform: inverseTransform,
+      rectangle: Rectangle.pack(rectangle, []),
+      transform: transform,
+      quadtree: quadtree,
+      width: width,
+      height: height,
+      skirtHeight: skirtHeight,
+    },
   };
 };
 export default HeightmapTessellator;

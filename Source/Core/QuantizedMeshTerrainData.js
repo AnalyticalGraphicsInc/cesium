@@ -389,7 +389,8 @@ QuantizedMeshTerrainData.prototype.createMesh = function (options) {
       result.westIndicesSouthToNorth,
       result.southIndicesEastToWest,
       result.eastIndicesNorthToSouth,
-      result.northIndicesWestToEast
+      result.northIndicesWestToEast,
+      null
     );
 
     // Free memory received from server after mesh is created.
