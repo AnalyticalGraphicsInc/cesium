@@ -17,6 +17,7 @@ import VertexArray from "../Renderer/VertexArray.js";
 import DepthPlaneFS from "../Shaders/DepthPlaneFS.js";
 import DepthPlaneVS from "../Shaders/DepthPlaneVS.js";
 import SceneMode from "./SceneMode.js";
+import Ellipsoid from "../Core/Ellipsoid.js"
 
 /**
  * @private
@@ -116,8 +117,11 @@ DepthPlane.prototype.update = function (frameState) {
     return;
   }
 
+  var minimumTerrainHeight = frameState.minimumTerrainHeight
+
   var context = frameState.context;
-  var ellipsoid = frameState.mapProjection.ellipsoid;
+  var r = frameState.mapProjection.ellipsoid.radii;
+  var ellipsoid = new Ellipsoid(r.x + minimumTerrainHeight, r.y + minimumTerrainHeight, r.z + minimumTerrainHeight);
   var useLogDepth = frameState.useLogDepth;
 
   if (!defined(this._command)) {
