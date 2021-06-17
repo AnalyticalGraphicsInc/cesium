@@ -387,3 +387,7 @@ geometryInstance = new GeometryInstance({
 });
 
 const canvas: HTMLCanvasElement | undefined = writeTextToCanvas("test");
+
+let pb = new PropertyBag();
+let hasProp: boolean = pb.hasProperty("xyz");
+property = pb.xyz;
