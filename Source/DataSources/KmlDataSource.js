@@ -51,6 +51,7 @@ import EntityCluster from "./EntityCluster.js";
 import EntityCollection from "./EntityCollection.js";
 import KmlCamera from "./KmlCamera.js";
 import KmlLookAt from "./KmlLookAt.js";
+import networkLinkUpdateMgr from "./networkLinkUpdateMgr.js";
 import KmlTour from "./KmlTour.js";
 import KmlTourFlyTo from "./KmlTourFlyTo.js";
 import KmlTourWait from "./KmlTourWait.js";
@@ -184,6 +185,8 @@ var featureTypes = {
   ScreenOverlay: processUnsupportedFeature,
   Tour: processTour,
 };
+
+var updateMgr = networkLinkUpdateMgr();
 
 function DeferredLoading(dataSource) {
   this._dataSource = dataSource;
@@ -2952,6 +2955,20 @@ function processNetworkLink(dataSource, node, processingData, deferredLoading) {
           }
           entities.resumeEvents();
 
+          updateMgr.addLink(href, rootElement.ownerDocument, dataSource);
+
+          var nlc = queryFirstNode(
+            rootElement,
+            "NetworkLinkControl",
+            namespaces.kml
+          );
+          if (nlc) {
+            var updateNode = queryFirstNode(nlc, "Update", namespaces.kml);
+            if (updateNode) {
+              updateMgr.processUpdate(updateNode);
+            }
+          }
+
           // Add network links to a list if we need they will need to be updated
           var refreshMode = queryStringValue(
             link,
@@ -3163,7 +3180,7 @@ function loadKml(
     });
 }
 
-function loadKmz(dataSource, entityCollection, blob, sourceResource) {
+function loadKmz(dataSource, entityCollection, blob, sourceResource, context) {
   var deferred = when.defer();
   zip.createReader(
     new zip.BlobReader(blob),
@@ -3219,7 +3236,8 @@ function loadKmz(dataSource, entityCollection, blob, sourceResource) {
               entityCollection,
               uriResolver.kml,
               sourceResource,
-              uriResolver
+              uriResolver,
+              context
             );
           })
           .then(deferred.resolve)
@@ -3266,7 +3284,13 @@ function load(dataSource, entityCollection, data, options) {
       if (dataToLoad instanceof Blob) {
         return isZipFile(dataToLoad).then(function (isZip) {
           if (isZip) {
-            return loadKmz(dataSource, entityCollection, dataToLoad, sourceUri);
+            return loadKmz(
+              dataSource,
+              entityCollection,
+              dataToLoad,
+              sourceUri,
+              context
+            );
           }
           return readBlobAsText(dataToLoad).then(function (text) {
             //There's no official way to validate if a parse was successful.
