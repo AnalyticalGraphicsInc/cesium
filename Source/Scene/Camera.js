@@ -3683,8 +3683,8 @@ var cartoArray = [
 ];
 
 function rotateQuad(quad, numRotations) {
-  const newQuad = new Array(4);
-  for (let i = 0, j = numRotations; i < 4; i++, j = (j + 1) % 4) {
+  var newQuad = new Array(4);
+  for (var i = 0, j = numRotations; i < 4; i++, j = (j + 1) % 4) {
     newQuad[j] = quad[i];
   }
   return newQuad;
@@ -3704,14 +3704,14 @@ function generalHeading(heading) {
   return "north";
 }
 
-const rotationsFromUp = {
+var rotationsFromUp = {
   up: 0,
   left: 1,
   down: 2,
   right: 3,
 };
 
-const headingQuadrant = {
+var headingQuadrant = {
   north: 0,
   east: 1,
   south: 2,
@@ -3729,7 +3729,7 @@ const headingQuadrant = {
 // Given that the corner indeces of the quad are [UL, LL, LR, UR],
 // the quad elements would be 'rotated' like so - [NW, SW, SE, NE] => [SE, NE, NW, SW]
 function changeQuadHeading(heading, direction, quad) {
-  const numRotations =
+  var numRotations =
     rotationsFromUp[direction] + headingQuadrant[generalHeading(heading)];
   return rotateQuad(quad, numRotations % 4);
 }
@@ -3750,37 +3750,34 @@ function addToResult(x, y, index, camera, ellipsoid) {
 }
 
 // Indeces in a quad array that represents a rectangle
-const UL = 0;
-const LL = 1;
-const LR = 2;
-const UR = 3;
+var UL = 0;
+var LL = 1;
+var LR = 2;
+var UR = 3;
 
 function generalCameraDirection(cornersShowingHorizon) {
   if (cornersShowingHorizon.length === 1) {
     if (cornersShowingHorizon[0] === UL || cornersShowingHorizon[0] === UR) {
       return "up";
-    } else {
-      return "down";
     }
+    return "down";
   }
 
   if (cornersShowingHorizon.length === 2) {
     if (cornersShowingHorizon[0] === UL) {
       if (cornersShowingHorizon[1] === LL) {
         return "left";
-      } else {
-        return "up";
       }
+      return "up";
     } else if (cornersShowingHorizon[0] === LL) {
       return "down";
-    } else {
-      return "right";
     }
+    return "right";
   }
 }
 
 function adjustViewForHorizon(camera, cornersShowingHorizon, ellipsoid) {
-  let horizonQuad = computeHorizonQuad(camera, ellipsoid);
+  var horizonQuad = computeHorizonQuad(camera, ellipsoid);
 
   horizonQuad = changeQuadHeading(
     CesiumMath.toDegrees(camera.heading),
@@ -3788,13 +3785,12 @@ function adjustViewForHorizon(camera, cornersShowingHorizon, ellipsoid) {
     horizonQuad
   );
 
-  for (let i = 0; i < cornersShowingHorizon.length; i++) {
-    const corner = cornersShowingHorizon[i];
+  cornersShowingHorizon.fromEach(function (corner) {
     cartoArray[corner] = ellipsoid.cartesianToCartographic(
       horizonQuad[corner],
       cartoArray[corner]
     );
-  }
+  });
 }
 
 /**
@@ -3825,7 +3821,7 @@ Camera.prototype.computeViewRectangle = function (ellipsoid, result) {
   var width = canvas.clientWidth;
   var height = canvas.clientHeight;
 
-  const unsuccessfulPicks = [];
+  var unsuccessfulPicks = [];
 
   if (!addToResult(0, 0, UL, this, ellipsoid)) {
     unsuccessfulPicks.push(UL);
