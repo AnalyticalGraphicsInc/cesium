@@ -3785,7 +3785,7 @@ function adjustViewForHorizon(camera, cornersShowingHorizon, ellipsoid) {
     horizonQuad
   );
 
-  cornersShowingHorizon.fromEach(function (corner) {
+  cornersShowingHorizon.forEach(function (corner) {
     cartoArray[corner] = ellipsoid.cartesianToCartographic(
       horizonQuad[corner],
       cartoArray[corner]
