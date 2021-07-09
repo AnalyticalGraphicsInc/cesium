@@ -3681,7 +3681,60 @@ var cartoArray = [
   new Cartographic(),
   new Cartographic(),
 ];
-function addToResult(x, y, index, camera, ellipsoid, computedHorizonQuad) {
+
+function rotateQuad(quad, numRotations) {
+  var newQuad = new Array(4);
+  for (var i = 0, j = numRotations; i < 4; i++, j = (j + 1) % 4) {
+    newQuad[j] = quad[i];
+  }
+  return newQuad;
+}
+
+function generalHeading(heading) {
+  if (heading > 45 && heading <= 135) {
+    return "east";
+  }
+  if (heading > 135 && heading <= 225) {
+    return "south";
+  }
+  if (heading > 225 && heading <= 315) {
+    return "west";
+  }
+
+  return "north";
+}
+
+var rotationsFromUp = {
+  up: 0,
+  left: 1,
+  down: 2,
+  right: 3,
+};
+
+var headingQuadrant = {
+  north: 0,
+  east: 1,
+  south: 2,
+  west: 3,
+};
+
+// Takes heading and camera direction (starting from direct view of earth from space)
+// and adjusts the quad array so that its corners roughly match where the camera is pointing.
+//
+// Ex.
+//    - direction is 'left' (looking toward the west with the horizon showing on the upper and lower left corners)
+//    - heading is 80 - camera is rotated clockwise toward the east (still showing horizon on upper and lower left corners).
+//                      At this point, the camera is upside down (up -> south).
+//
+// Given that the corner indeces of the quad are [UL, LL, LR, UR],
+// the quad elements would be 'rotated' like so - [NW, SW, SE, NE] => [SE, NE, NW, SW]
+function changeQuadHeading(heading, direction, quad) {
+  var numRotations =
+    rotationsFromUp[direction] + headingQuadrant[generalHeading(heading)];
+  return rotateQuad(quad, numRotations % 4);
+}
+
+function addToResult(x, y, index, camera, ellipsoid) {
   scratchPickCartesian2.x = x;
   scratchPickCartesian2.y = y;
   var r = camera.pickEllipsoid(
@@ -3691,14 +3744,55 @@ function addToResult(x, y, index, camera, ellipsoid, computedHorizonQuad) {
   );
   if (defined(r)) {
     cartoArray[index] = ellipsoid.cartesianToCartographic(r, cartoArray[index]);
-    return 1;
+    return true;
   }
-  cartoArray[index] = ellipsoid.cartesianToCartographic(
-    computedHorizonQuad[index],
-    cartoArray[index]
-  );
-  return 0;
+  return false;
 }
+
+// Indeces in a quad array that represents a rectangle
+var UL = 0;
+var LL = 1;
+var LR = 2;
+var UR = 3;
+
+function generalCameraDirection(cornersShowingHorizon) {
+  if (cornersShowingHorizon.length === 1) {
+    if (cornersShowingHorizon[0] === UL || cornersShowingHorizon[0] === UR) {
+      return "up";
+    }
+    return "down";
+  }
+
+  if (cornersShowingHorizon.length === 2) {
+    if (cornersShowingHorizon[0] === UL) {
+      if (cornersShowingHorizon[1] === LL) {
+        return "left";
+      }
+      return "up";
+    } else if (cornersShowingHorizon[0] === LL) {
+      return "down";
+    }
+    return "right";
+  }
+}
+
+function adjustViewForHorizon(camera, cornersShowingHorizon, ellipsoid) {
+  var horizonQuad = computeHorizonQuad(camera, ellipsoid);
+
+  horizonQuad = changeQuadHeading(
+    CesiumMath.toDegrees(camera.heading),
+    generalCameraDirection(cornersShowingHorizon),
+    horizonQuad
+  );
+
+  cornersShowingHorizon.forEach(function (corner) {
+    cartoArray[corner] = ellipsoid.cartesianToCartographic(
+      horizonQuad[corner],
+      cartoArray[corner]
+    );
+  });
+}
+
 /**
  * Computes the approximate visible rectangle on the ellipsoid.
  *
@@ -3727,46 +3821,28 @@ Camera.prototype.computeViewRectangle = function (ellipsoid, result) {
   var width = canvas.clientWidth;
   var height = canvas.clientHeight;
 
-  var successfulPickCount = 0;
+  var unsuccessfulPicks = [];
 
-  var computedHorizonQuad = computeHorizonQuad(this, ellipsoid);
+  if (!addToResult(0, 0, UL, this, ellipsoid)) {
+    unsuccessfulPicks.push(UL);
+  }
+  if (!addToResult(0, height, LL, this, ellipsoid)) {
+    unsuccessfulPicks.push(LL);
+  }
+  if (!addToResult(width, height, LR, this, ellipsoid)) {
+    unsuccessfulPicks.push(LR);
+  }
+  if (!addToResult(width, 0, UR, this, ellipsoid)) {
+    unsuccessfulPicks.push(UR);
+  }
 
-  successfulPickCount += addToResult(
-    0,
-    0,
-    0,
-    this,
-    ellipsoid,
-    computedHorizonQuad
-  );
-  successfulPickCount += addToResult(
-    0,
-    height,
-    1,
-    this,
-    ellipsoid,
-    computedHorizonQuad
-  );
-  successfulPickCount += addToResult(
-    width,
-    height,
-    2,
-    this,
-    ellipsoid,
-    computedHorizonQuad
-  );
-  successfulPickCount += addToResult(
-    width,
-    0,
-    3,
-    this,
-    ellipsoid,
-    computedHorizonQuad
-  );
-
-  if (successfulPickCount < 2) {
+  if (unsuccessfulPicks.length > 2) {
     // If we have space non-globe in 3 or 4 corners then return the whole globe
     return Rectangle.MAX_VALUE;
+  }
+
+  if (unsuccessfulPicks.length > 0) {
+    adjustViewForHorizon(this, unsuccessfulPicks, ellipsoid);
   }
 
   result = Rectangle.fromCartographicArray(cartoArray, result);
