@@ -129,6 +129,7 @@
 ##### Additions :tada:
 
 - Added `ElevationBand` material, which maps colors and gradients to exact elevations. [#9132](https://github.com/CesiumGS/cesium/pull/9132)
+- New algorithm for `PolylineArrowMaterial`, added `outlineColor` and `outlineWidth` to the uniforms. [#8793](https://github.com/CesiumGS/cesium/pull/8793)
 
 ##### Fixes :wrench:
 
