@@ -182,7 +182,13 @@ function WebMapServiceImageryProvider(options) {
 
   var resource = Resource.createIfNeeded(options.url);
 
-  var pickFeatureResource = resource.clone();
+  /**
+   * the pickFeatureResource should be able to modify, because some
+   * WMS servers might have different URL for GetFeatureInfo, e.g. ALA
+   */
+  var pickFeatureResource = defined(options.getFeatureInfoUrl)
+    ? Resource.createIfNeeded(options.getFeatureInfoUrl)
+    : resource.clone();
 
   resource.setQueryParameters(
     WebMapServiceImageryProvider.DefaultParameters,
@@ -268,6 +274,9 @@ function WebMapServiceImageryProvider(options) {
   pickFeatureResource.setQueryParameters(pickFeatureParams, true);
 
   this._resource = resource;
+
+  // TODO: change this pickFeatureResource to something like options.getFeaturesUrl if this option exists, else use the getCapabilities default URL
+  // UPDATE: a new paramter getFeatureInfoUrl has been introduced, if the parameter is found in options, the pickFeaturesRource will refer to the paramter
   this._pickFeaturesResource = pickFeatureResource;
   this._layers = options.layers;
 
