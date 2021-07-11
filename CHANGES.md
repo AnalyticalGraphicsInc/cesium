@@ -170,6 +170,7 @@
 - Fixed an issue where ground primitives would get clipped at certain camera angles. [#9114](https://github.com/CesiumGS/cesium/issues/9114)
 - Fixed a bug that could cause half of the globe to disappear when setting the `terrainProvider. [#9161](https://github.com/CesiumGS/cesium/pull/9161)
 - Fixed a crash when loading Cesium OSM buildings with shadows enabled. [#9172](https://github.com/CesiumGS/cesium/pull/9172)
+- Fixed an issue with Firefox and dimensionless SVG images. [#9188](https://github.com/CesiumGS/cesium/9188)
 
 ### 1.73 - 2020-09-01
 

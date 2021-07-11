@@ -1876,6 +1876,16 @@ function loadImageElement(url, crossOrigin, deferred) {
   var image = new Image();
 
   image.onload = function () {
+    // work-around a known issue with Firefox and dimensionless SVG, see https://github.com/CesiumGS/cesium/issues/9188
+    if (
+      image.naturalWidth === 0 &&
+      image.naturalHeight === 0 &&
+      image.width === 0 &&
+      image.height === 0
+    ) {
+      image.width = 300;
+      image.height = 150;
+    }
     deferred.resolve(image);
   };
 
