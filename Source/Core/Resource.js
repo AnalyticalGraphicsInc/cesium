@@ -2225,7 +2225,8 @@ Resource._DefaultImplementations.loadAndExecuteScript =
 Resource.DEFAULT = Object.freeze(
   new Resource({
     url:
-      typeof document === "undefined"
+      typeof document === "undefined" ||
+      typeof document.location === "undefined"
         ? ""
         : document.location.href.split("?")[0],
   })
