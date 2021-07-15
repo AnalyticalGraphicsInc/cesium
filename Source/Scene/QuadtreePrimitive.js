@@ -206,6 +206,20 @@ QuadtreePrimitive.prototype.invalidateAllTiles = function () {
   this._tilesInvalidated = true;
 };
 
+function containsOwnerHeightCallbackData(heightCallbacks, owner) {
+  var found = false;
+  if (defined(owner)) {
+    for (var i = 0; i < heightCallbacks.length; ++i) {
+      var cbData = heightCallbacks[i];
+      if (cbData.owner === owner) {
+        found = true;
+        break;
+      }
+    }
+  }
+  return found;
+}
+
 function invalidateAllTiles(primitive) {
   // Clear the replacement queue
   var replacementQueue = primitive._tileReplacementQueue;
@@ -226,7 +240,15 @@ function invalidateAllTiles(primitive) {
       for (var j = 0; j < customDataLength; ++j) {
         var data = customData[j];
         data.level = 0;
-        primitive._addHeightCallbacks.push(data);
+
+        if (
+          !containsOwnerHeightCallbackData(
+            primitive._addHeightCallbacks,
+            data.owner
+          )
+        ) {
+          primitive._addHeightCallbacks.push(data);
+        }
       }
 
       levelZeroTiles[i].freeResources();
@@ -275,15 +297,21 @@ QuadtreePrimitive.prototype.forEachRenderedTile = function (tileFunction) {
  *
  * @param {Cartographic} cartographic The cartographic position.
  * @param {Function} callback The function to be called when a new tile is loaded containing cartographic.
+ * @param {Object} [owner] Object requesting height update callback
  * @returns {Function} The function to remove this callback from the quadtree.
  */
-QuadtreePrimitive.prototype.updateHeight = function (cartographic, callback) {
+QuadtreePrimitive.prototype.updateHeight = function (
+  cartographic,
+  callback,
+  owner
+) {
   var primitive = this;
   var object = {
     positionOnEllipsoidSurface: undefined,
     positionCartographic: cartographic,
     level: -1,
     callback: callback,
+    owner: owner,
   };
 
   object.removeFunc = function () {
